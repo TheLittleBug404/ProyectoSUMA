@@ -4,7 +4,7 @@ import type { ISaleRepository } from '../interfaces/ISaleRepository';
 
 export class DexieSaleRepository implements ISaleRepository {
   async createSale(saleData: Omit<Sale, 'id' | 'fecha'>): Promise<Sale> {
-    return await db.transaction('rw', db.ventas, db.productos, async () => {
+    return await db.transaction('rw', [db.ventas, db.productos, db.clientes], async () => {
       // 1. Validar y descontar stock de cada ítem
       for (const item of saleData.items) {
         const prod = await db.productos.get(item.productoId);
@@ -15,12 +15,38 @@ export class DexieSaleRepository implements ISaleRepository {
           throw new Error(`Stock insuficiente para "${prod.nombre}". Disponible: ${prod.stock}, Solicitado: ${item.cantidad}`);
         }
 
+        const updatedStockPorSucursal = prod.stockPorSucursal ? { ...prod.stockPorSucursal } : undefined;
+        if (updatedStockPorSucursal && saleData.sucursalId && updatedStockPorSucursal[saleData.sucursalId] !== undefined) {
+          updatedStockPorSucursal[saleData.sucursalId] = Math.max(0, updatedStockPorSucursal[saleData.sucursalId] - item.cantidad);
+        }
+
+        const updatedStockPorTalla = prod.stockPorTalla ? { ...prod.stockPorTalla } : undefined;
+        if (updatedStockPorTalla && item.talla && updatedStockPorTalla[item.talla] !== undefined) {
+          updatedStockPorTalla[item.talla] = Math.max(0, updatedStockPorTalla[item.talla] - item.cantidad);
+        }
+
         await db.productos.update(prod.id, {
-          stock: prod.stock - item.cantidad
+          stock: prod.stock - item.cantidad,
+          stockPorSucursal: updatedStockPorSucursal,
+          stockPorTalla: updatedStockPorTalla
         });
       }
 
-      // 2. Guardar la venta con fecha actual
+      // 2. Si hay cliente registrado, actualizar sus compras y puntos (1 punto por cada 10 Bs)
+      if (saleData.clienteId) {
+        const cliente = await db.clientes.get(saleData.clienteId);
+        if (cliente) {
+          const currentTotal = cliente.totalCompras || 0;
+          const currentPuntos = cliente.puntos || 0;
+          const puntosGanados = Math.floor(saleData.total / 10);
+          await db.clientes.update(cliente.id, {
+            totalCompras: currentTotal + saleData.total,
+            puntos: currentPuntos + puntosGanados
+          });
+        }
+      }
+
+      // 3. Guardar la venta con fecha actual
       const sale: Sale = {
         ...saleData,
         id: crypto.randomUUID(),

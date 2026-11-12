@@ -7,7 +7,12 @@ export const productSchema = z.object({
   stock: z.number().int().min(0, 'El stock no puede ser negativo'),
   categoriaId: z.string().min(1, 'Seleccione una categoría'),
   talla: z.string().optional(),
+  tallas: z.array(z.string()).optional(),
+  stockPorSucursal: z.record(z.string(), z.number()).optional(),
+  stockPorTalla: z.record(z.string(), z.number()).optional(),
   color: z.string().optional(),
+  colorHex: z.string().optional(),
+  sucursalesIds: z.array(z.string()).optional(),
   qrCode: z.string().optional(),
   fotoUrl: z.string().optional()
 });

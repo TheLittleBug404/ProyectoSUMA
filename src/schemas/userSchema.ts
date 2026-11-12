@@ -6,7 +6,8 @@ export const userSchema = z.object({
   password: z.string().optional(),
   rol: z.enum(['ADMINISTRADOR', 'EMPLEADO', 'CLIENTE']),
   sucursalId: z.string(),
-  activo: z.boolean()
+  activo: z.boolean(),
+  sueldo: z.number().min(0, 'El sueldo debe ser mayor o igual a 0').optional()
 });
 
 export type UserFormData = z.infer<typeof userSchema>;

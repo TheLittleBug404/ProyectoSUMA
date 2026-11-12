@@ -16,7 +16,48 @@ export interface User {
   rol: UserRole;
   sucursalId: string;
   activo: boolean;
+  sueldo?: number; // Sueldo base mensual en Bolivianos (Bs.)
   createdAt?: string;
+}
+
+export type CashShiftStatus = 'ABIERTA' | 'CERRADA';
+export type CashExpenseCategory = 'PROVEEDOR' | 'SERVICIOS' | 'SUELDO' | 'ADELANTO' | 'VARIOS';
+
+export interface CashRegister {
+  id: string;
+  sucursalId: string;
+  empleadoId: string;
+  empleadoNombre?: string;
+  fechaApertura: string; // ISO
+  montoApertura: number; // Fondo inicial / base en gaveta
+  fechaCierre?: string; // ISO
+  cerradoPorId?: string;
+  cerradoPorNombre?: string;
+  estado: CashShiftStatus;
+  
+  // Resumen calculado al cierre o en vivo
+  totalVentasEfectivo: number;
+  totalVentasQR: number;
+  totalVentasTarjeta: number;
+  totalEgresos: number;
+  montoEsperadoEfectivo: number; // montoApertura + totalVentasEfectivo - totalEgresos
+  montoRealEfectivo?: number; // Conteo físico arqueo
+  diferencia?: number; // montoRealEfectivo - montoEsperadoEfectivo
+  notas?: string;
+}
+
+export interface CashExpense {
+  id: string;
+  cajaId?: string; // Vinculado a turno de caja abierta
+  sucursalId: string;
+  empleadoId: string;
+  empleadoNombre?: string;
+  tipo: 'EGRESO' | 'INGRESO_EXTRA';
+  categoria: CashExpenseCategory;
+  descripcion: string;
+  monto: number;
+  fecha: string; // ISO
+  comprobante?: string;
 }
 
 export interface Category {
@@ -38,9 +79,14 @@ export interface Product {
   qrCode: string; // Codigo unico para escaneo
   activo: boolean;
   sucursalId: string;
+  sucursalesIds?: string[]; // IDs de las sucursales donde se vende o ['TODAS']
   createdAt: string;
   talla?: string;
+  tallas?: string[]; // Tallas disponibles (ej: ['S', 'M', 'L', 'XL'])
+  stockPorTalla?: Record<string, number>; // { [talla]: stock }
+  stockPorSucursal?: Record<string, number>; // { [sucursalId]: stock }
   color?: string;
+  colorHex?: string; // Código hexadecimal para paleta visual (ej: #000000)
 }
 
 export interface SaleItem {
@@ -49,17 +95,69 @@ export interface SaleItem {
   cantidad: number;
   precioUnitario: number;
   subtotal: number;
+  talla?: string;
+  color?: string;
+}
+
+export interface Customer {
+  id: string;
+  nombre: string;
+  documento?: string; // CI / NIT
+  telefono?: string; // Celular / WhatsApp
+  email?: string;
+  descuentoFrecuente?: number; // % descuento fijo (ej: 5 para 5%)
+  totalCompras?: number;
+  puntos?: number;
+  notas?: string;
+  createdAt: string;
+}
+
+export interface SaleReturnItem {
+  productoId: string;
+  nombreProducto: string;
+  cantidad: number;
+  precioUnitario: number;
+  talla?: string;
+  color?: string;
+  motivo: string;
+}
+
+export interface SaleReturn {
+  id: string;
+  ventaId: string;
+  numeroTicketOriginal: string;
+  numeroDevolucion: string; // ej: DEV-123456
+  empleadoId: string;
+  empleadoNombre?: string;
+  sucursalId: string;
+  sucursalNombre?: string;
+  fecha: string;
+  tipo: 'DEVOLUCION_DINERO' | 'CAMBIO_PRENDA';
+  itemsDevueltos: SaleReturnItem[];
+  montoDevuelto: number;
+  itemsNuevos?: SaleItem[];
+  diferenciaCobrada?: number;
+  notas?: string;
 }
 
 export interface Sale {
   id: string;
   numeroTicket: string;
   empleadoId: string;
+  empleadoNombre?: string;
   sucursalId: string;
+  sucursalNombre?: string;
   fecha: string; // ISO string
   items: SaleItem[];
+  subtotal?: number;
+  descuentoPorcentaje?: number;
+  descuentoMonto?: number;
   total: number;
   metodoPago: 'EFECTIVO' | 'QR' | 'TARJETA';
+  clienteId?: string;
+  clienteNombre?: string;
+  clienteTelefono?: string;
+  clienteDocumento?: string;
 }
 
 export interface SaleStats {

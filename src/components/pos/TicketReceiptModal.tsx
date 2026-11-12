@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, CheckCircle2, X } from 'lucide-react';
+import { Printer, CheckCircle2, X, MessageCircle } from 'lucide-react';
 import type { Sale } from '../../types/domain';
 
 interface TicketReceiptModalProps {
@@ -25,6 +25,37 @@ export const TicketReceiptModal: React.FC<TicketReceiptModalProps> = ({
     dateStyle: 'medium',
     timeStyle: 'short'
   });
+
+  const handleSendWhatsApp = () => {
+    let targetPhone = sale.clienteTelefono || '';
+    if (!targetPhone) {
+      const input = window.prompt('Ingresa el número de WhatsApp del cliente (ej: 70123456):');
+      if (!input) return;
+      targetPhone = input;
+    }
+
+    const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+    const itemsText = sale.items
+      .map(i => `• ${i.cantidad}x ${i.nombreProducto}${i.talla ? ` [Talla ${i.talla}]` : ''} - Bs. ${i.subtotal.toFixed(2)}`)
+      .join('\n');
+
+    const msg = `👗 *SAMU Moda Femenina*
+*Ticket de Venta:* ${sale.numeroTicket}
+*Fecha:* ${formattedDate}
+*Sucursal:* ${branchName}
+*Cajero:* ${cashierName}
+${sale.clienteNombre ? `*Cliente:* ${sale.clienteNombre}\n` : ''}--------------------------------
+*Prendas:*
+${itemsText}
+--------------------------------
+${sale.descuentoMonto ? `Subtotal: Bs. ${(sale.subtotal || sale.total).toFixed(2)}\nDescuento: -Bs. ${sale.descuentoMonto.toFixed(2)}\n` : ''}*TOTAL COBRADO:* Bs. ${sale.total.toFixed(2)}
+*Método de Pago:* ${sale.metodoPago}
+
+¡Muchas gracias por su preferencia! Conserve este mensaje para cualquier cambio de prenda.`;
+
+    const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
@@ -67,6 +98,12 @@ export const TicketReceiptModal: React.FC<TicketReceiptModalProps> = ({
               <span className="text-zinc-600">Fecha:</span>
               <span>{formattedDate}</span>
             </div>
+            {sale.clienteNombre && (
+              <div className="flex justify-between">
+                <span className="text-zinc-600">Cliente:</span>
+                <span className="font-bold">{sale.clienteNombre}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-zinc-600">Atendido por:</span>
               <span className="font-semibold">{cashierName}</span>
@@ -88,7 +125,9 @@ export const TicketReceiptModal: React.FC<TicketReceiptModalProps> = ({
                 <div key={idx} className="flex justify-between items-start text-[11px]">
                   <div className="pr-2">
                     <p className="font-bold text-black line-clamp-1">{item.nombreProducto}</p>
-                    <p className="text-[10px] text-zinc-600">{item.cantidad} x Bs. {item.precioUnitario.toFixed(2)}</p>
+                    <p className="text-[10px] text-zinc-600">
+                      {item.cantidad} x Bs. {item.precioUnitario.toFixed(2)} {item.talla ? `[Talla ${item.talla}]` : ''}
+                    </p>
                   </div>
                   <span className="font-bold shrink-0">Bs. {item.subtotal.toFixed(2)}</span>
                 </div>
@@ -96,9 +135,21 @@ export const TicketReceiptModal: React.FC<TicketReceiptModalProps> = ({
             </div>
           </div>
 
-          {/* Totals */}
+          {/* Totals & Discounts */}
           <div className="py-3 border-b border-dashed border-zinc-400 space-y-1">
-            <div className="flex justify-between text-base font-black text-black">
+            {sale.descuentoMonto && sale.descuentoMonto > 0 ? (
+              <>
+                <div className="flex justify-between text-zinc-600">
+                  <span>Subtotal:</span>
+                  <span>Bs. {(sale.subtotal || sale.total).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-amber-700 font-semibold">
+                  <span>Descuento ({sale.descuentoPorcentaje || 0}%):</span>
+                  <span>- Bs. {sale.descuentoMonto.toFixed(2)}</span>
+                </div>
+              </>
+            ) : null}
+            <div className="flex justify-between text-base font-black text-black pt-1">
               <span>TOTAL:</span>
               <span>Bs. {sale.total.toFixed(2)}</span>
             </div>
@@ -113,16 +164,24 @@ export const TicketReceiptModal: React.FC<TicketReceiptModalProps> = ({
         </div>
 
         {/* Modal Actions */}
-        <div className="p-4 bg-[#181820] border-t border-zinc-800 flex items-center gap-2 print:hidden">
-          <button
-            onClick={handlePrint}
-            className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 transition-colors flex items-center justify-center gap-2 shadow cursor-pointer"
-          >
-            <Printer className="w-4 h-4" /> Imprimir Recibo
-          </button>
+        <div className="p-3.5 bg-[#181820] border-t border-zinc-800 flex flex-col gap-2 print:hidden">
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 transition-colors flex items-center justify-center gap-1.5 shadow cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> Imprimir Ticket
+            </button>
+            <button
+              onClick={handleSendWhatsApp}
+              className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors flex items-center justify-center gap-1.5 shadow cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4" /> WhatsApp
+            </button>
+          </div>
           <button
             onClick={onClose}
-            className="py-2.5 px-4 rounded-xl text-xs font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+            className="w-full py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer text-center"
           >
             Nueva Venta
           </button>

@@ -16,8 +16,14 @@ export class DexieProductRepository implements IProductRepository {
       items = items.filter(p => p.categoriaId === filter.categoriaId);
     }
 
-    if (filter?.sucursalId) {
-      items = items.filter(p => p.sucursalId === filter.sucursalId);
+    if (filter?.sucursalId && filter.sucursalId !== 'all') {
+      const targetSucursal = filter.sucursalId;
+      items = items.filter(p => {
+        if (!p.sucursalesIds || p.sucursalesIds.length === 0) {
+          return !p.sucursalId || p.sucursalId === targetSucursal;
+        }
+        return p.sucursalesIds.includes('TODAS') || p.sucursalesIds.includes(targetSucursal);
+      });
     }
 
     return items;

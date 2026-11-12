@@ -4,11 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { X, Users, Sparkles } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { userSchema, type UserFormData } from '../../schemas/userSchema';
-import type { User } from '../../types/domain';
+import type { User, Branch } from '../../types/domain';
 
 interface UserFormModalProps {
   isOpen: boolean;
   userToEdit?: User | null;
+  branches: Branch[];
   onClose: () => void;
   onSave: (data: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
 }
@@ -16,6 +17,7 @@ interface UserFormModalProps {
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   isOpen,
   userToEdit,
+  branches,
   onClose,
   onSave
 }) => {
@@ -41,7 +43,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           password: '',
           rol: userToEdit.rol,
           sucursalId: userToEdit.sucursalId,
-          activo: userToEdit.activo
+          activo: userToEdit.activo,
+          sueldo: userToEdit.sueldo
         });
       } else {
         reset({
@@ -49,12 +52,13 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           email: '',
           password: '12345',
           rol: 'EMPLEADO',
-          sucursalId: 'sucursal-principal-01',
-          activo: true
+          sucursalId: branches[0]?.id || 'sucursal-principal-01',
+          activo: true,
+          sueldo: undefined
         });
       }
     }
-  }, [isOpen, userToEdit, reset]);
+  }, [isOpen, userToEdit, branches, reset]);
 
   if (!isOpen) return null;
 
@@ -79,7 +83,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         passwordHash,
         rol: data.rol,
         sucursalId: data.sucursalId,
-        activo: data.activo
+        activo: data.activo,
+        sueldo: data.sueldo !== undefined && !isNaN(Number(data.sueldo)) ? Number(data.sueldo) : undefined
       });
 
       onClose();
@@ -154,6 +159,40 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               {...register('password')}
               className="w-full bg-[#18181f] border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+              Sueldo Base Mensual (Bs.)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="ej: 2500.00"
+              {...register('sueldo', { 
+                setValueAs: (v) => (v === '' || v === null || isNaN(Number(v)) ? undefined : Number(v))
+              })}
+              className="w-full bg-[#18181f] border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
+            />
+            {errors.sueldo && <p className="text-[11px] text-red-400 mt-1">{errors.sueldo.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+              Sucursal Asignada *
+            </label>
+            <select
+              {...register('sucursalId')}
+              className="w-full bg-[#18181f] border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre} {!b.activa ? '(Inactiva)' : ''}
+                </option>
+              ))}
+            </select>
+            {errors.sucursalId && <p className="text-[11px] text-red-400 mt-1">{errors.sucursalId.message}</p>}
           </div>
 
           <div>

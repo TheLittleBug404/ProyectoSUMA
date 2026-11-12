@@ -8,8 +8,11 @@ import { POSPage } from '../pages/employee/POSPage';
 import { AdminProductsPage } from '../pages/admin/AdminProductsPage';
 import { AdminCategoriesPage } from '../pages/admin/AdminCategoriesPage';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
+import { AdminBranchesPage } from '../pages/admin/AdminBranchesPage';
+import { AdminCashPage } from '../pages/admin/AdminCashPage';
 import { DashboardPage } from '../pages/admin/DashboardPage';
 import { BackupPage } from '../pages/admin/BackupPage';
+import { AdminCustomersPage } from '../pages/admin/AdminCustomersPage';
 
 // Layout que incluye la barra de navegación superior
 const AppLayout: React.FC = () => {
@@ -79,6 +82,30 @@ export const AppRouter: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={['ADMINISTRADOR']}>
                 <AdminUsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/sucursales"
+            element={
+              <ProtectedRoute allowedRoles={['ADMINISTRADOR']}>
+                <AdminBranchesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/clientes"
+            element={
+              <ProtectedRoute allowedRoles={['ADMINISTRADOR']}>
+                <AdminCustomersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/caja"
+            element={
+              <ProtectedRoute allowedRoles={['ADMINISTRADOR']}>
+                <AdminCashPage />
               </ProtectedRoute>
             }
           />

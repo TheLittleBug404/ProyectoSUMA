@@ -13,7 +13,9 @@ import {
   UserCheck, 
   User as UserIcon,
   Menu,
-  X
+  X,
+  Landmark,
+  Building2
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import samuLogo from '../../assets/samu-logo.jpg';
@@ -113,11 +115,20 @@ export const AppNavbar: React.FC = () => {
               <NavLink to="/admin/dashboard" className={navLinkClass}>
                 <LayoutDashboard className="w-3.5 h-3.5" /> Métricas
               </NavLink>
+              <NavLink to="/admin/caja" className={navLinkClass}>
+                <Landmark className="w-3.5 h-3.5" /> Caja & Cierres
+              </NavLink>
               <NavLink to="/admin/productos" className={navLinkClass}>
                 <Shirt className="w-3.5 h-3.5" /> Prendas
               </NavLink>
               <NavLink to="/admin/categorias" className={navLinkClass}>
                 <Tags className="w-3.5 h-3.5" /> Categorías
+              </NavLink>
+              <NavLink to="/admin/sucursales" className={navLinkClass}>
+                <Building2 className="w-3.5 h-3.5" /> Sucursales
+              </NavLink>
+              <NavLink to="/admin/clientes" className={navLinkClass}>
+                <UserCheck className="w-3.5 h-3.5" /> Clientes
               </NavLink>
               <NavLink to="/admin/usuarios" className={navLinkClass}>
                 <Users className="w-3.5 h-3.5" /> Equipo
@@ -207,6 +218,13 @@ export const AppNavbar: React.FC = () => {
                 <LayoutDashboard className="w-4 h-4 text-amber-400" /> Métricas & Dashboard
               </NavLink>
               <NavLink 
+                to="/admin/caja" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={mobileNavLinkClass}
+              >
+                <Landmark className="w-4 h-4 text-amber-400" /> Caja & Cierres
+              </NavLink>
+              <NavLink 
                 to="/admin/productos" 
                 onClick={() => setMobileMenuOpen(false)}
                 className={mobileNavLinkClass}
@@ -219,6 +237,20 @@ export const AppNavbar: React.FC = () => {
                 className={mobileNavLinkClass}
               >
                 <Tags className="w-4 h-4 text-amber-400" /> Categorías
+              </NavLink>
+              <NavLink 
+                to="/admin/sucursales" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={mobileNavLinkClass}
+              >
+                <Building2 className="w-4 h-4 text-amber-400" /> Sucursales de Tienda
+              </NavLink>
+              <NavLink 
+                to="/admin/clientes" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={mobileNavLinkClass}
+              >
+                <UserCheck className="w-4 h-4 text-amber-400" /> Directorio de Clientes
               </NavLink>
               <NavLink 
                 to="/admin/usuarios" 

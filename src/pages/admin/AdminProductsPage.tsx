@@ -8,11 +8,13 @@ import {
   Shirt, 
   AlertTriangle, 
   CheckCircle2, 
-  RefreshCw 
+  RefreshCw,
+  Building2
 } from 'lucide-react';
-import type { Product, Category } from '../../types/domain';
+import type { Product, Category, Branch } from '../../types/domain';
 import { productRepository } from '../../repositories/dexie/DexieProductRepository';
 import { categoryRepository } from '../../repositories/dexie/DexieCategoryRepository';
+import { branchRepository } from '../../repositories/dexie/DexieBranchRepository';
 import { ProductFormModal } from '../../components/admin/ProductFormModal';
 import { PrintQREtiquetteModal } from '../../components/admin/PrintQREtiquetteModal';
 import type { ProductFormData } from '../../schemas/productSchema';
@@ -20,11 +22,13 @@ import type { ProductFormData } from '../../schemas/productSchema';
 export const AdminProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState('all');
 
   // Modals state
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -34,12 +38,14 @@ export const AdminProductsPage: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [prods, cats] = await Promise.all([
+      const [prods, cats, branchList] = await Promise.all([
         productRepository.getAll({ soloActivos: true }),
-        categoryRepository.getAll()
+        categoryRepository.getAll(),
+        branchRepository.getAll()
       ]);
       setProducts(prods);
       setCategories(cats);
+      setBranches(branchList);
     } catch (err) {
       console.error('Error cargando inventario admin:', err);
     } finally {
@@ -55,6 +61,10 @@ export const AdminProductsPage: React.FC = () => {
     return new Map(categories.map(c => [c.id, c.nombre]));
   }, [categories]);
 
+  const branchMap = useMemo(() => {
+    return new Map(branches.map(b => [b.id, b.nombre]));
+  }, [branches]);
+
   const filteredProducts = useMemo(() => {
     let list = [...products];
 
@@ -63,7 +73,8 @@ export const AdminProductsPage: React.FC = () => {
       list = list.filter(p =>
         p.nombre.toLowerCase().includes(term) ||
         p.qrCode.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term)
+        p.descripcion.toLowerCase().includes(term) ||
+        (p.color && p.color.toLowerCase().includes(term))
       );
     }
 
@@ -71,8 +82,17 @@ export const AdminProductsPage: React.FC = () => {
       list = list.filter(p => p.categoriaId === selectedCategory);
     }
 
+    if (selectedBranch !== 'all') {
+      list = list.filter(p => {
+        if (!p.sucursalesIds || p.sucursalesIds.length === 0) {
+          return !p.sucursalId || p.sucursalId === selectedBranch;
+        }
+        return p.sucursalesIds.includes('TODAS') || p.sucursalesIds.includes(selectedBranch);
+      });
+    }
+
     return list;
-  }, [products, searchTerm, selectedCategory]);
+  }, [products, searchTerm, selectedCategory, selectedBranch]);
 
   const handleSaveProduct = async (data: ProductFormData, imageBlob?: Blob) => {
     if (productToEdit) {
@@ -83,7 +103,11 @@ export const AdminProductsPage: React.FC = () => {
         stock: data.stock,
         categoriaId: data.categoriaId,
         talla: data.talla,
+        tallas: data.tallas,
+        stockPorSucursal: data.stockPorSucursal,
         color: data.color,
+        colorHex: data.colorHex,
+        sucursalesIds: data.sucursalesIds || ['TODAS'],
         qrCode: data.qrCode || productToEdit.qrCode,
         fotoUrl: data.fotoUrl,
         imagenBlob: imageBlob || productToEdit.imagenBlob
@@ -96,12 +120,16 @@ export const AdminProductsPage: React.FC = () => {
         stock: data.stock,
         categoriaId: data.categoriaId,
         talla: data.talla,
+        tallas: data.tallas,
+        stockPorSucursal: data.stockPorSucursal,
         color: data.color,
+        colorHex: data.colorHex,
+        sucursalesIds: data.sucursalesIds || ['TODAS'],
         qrCode: data.qrCode || `SAMU-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
         fotoUrl: data.fotoUrl,
         imagenBlob: imageBlob,
         activo: true,
-        sucursalId: 'sucursal-principal-01'
+        sucursalId: data.sucursalesIds?.[0] || 'sucursal-principal-01'
       });
     }
 
@@ -163,6 +191,17 @@ export const AdminProductsPage: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="bg-[#121216] border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="all">Todas las Sedes</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.nombre}</option>
+              ))}
+            </select>
+
+            <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="bg-[#121216] border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-400 cursor-pointer"
@@ -192,6 +231,7 @@ export const AdminProductsPage: React.FC = () => {
                   <th className="py-3.5 px-4">Prenda / Foto</th>
                   <th className="py-3.5 px-4">Código QR</th>
                   <th className="py-3.5 px-4">Categoría</th>
+                  <th className="py-3.5 px-4">Sucursales</th>
                   <th className="py-3.5 px-4">Talla / Color</th>
                   <th className="py-3.5 px-4">Precio</th>
                   <th className="py-3.5 px-4">Stock</th>
@@ -201,13 +241,13 @@ export const AdminProductsPage: React.FC = () => {
               <tbody className="divide-y divide-zinc-800/60">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-400">
+                    <td colSpan={8} className="py-12 text-center text-zinc-400">
                       Cargando inventario desde IndexedDB...
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-500">
+                    <td colSpan={8} className="py-12 text-center text-zinc-500">
                       No se encontraron prendas con los filtros aplicados.
                     </td>
                   </tr>
@@ -242,10 +282,45 @@ export const AdminProductsPage: React.FC = () => {
                           {categoryMap.get(p.categoriaId) || 'Sin Categoría'}
                         </td>
 
+                        {/* Sucursales */}
+                        <td className="py-3 px-4">
+                          {p.sucursalesIds?.includes('TODAS') ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                              <Building2 className="w-2.5 h-2.5" /> Todas
+                            </span>
+                          ) : p.sucursalesIds && p.sucursalesIds.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 max-w-[150px]">
+                              {p.sucursalesIds.map(bId => (
+                                <span key={bId} className="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-300 border border-zinc-700">
+                                  {branchMap.get(bId) || 'Sede'}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-zinc-400">
+                              {branchMap.get(p.sucursalId) || 'Principal'}
+                            </span>
+                          )}
+                        </td>
+
                         {/* Talla / Color */}
                         <td className="py-3 px-4 text-zinc-400">
-                          <span className="text-zinc-200 font-semibold">{p.talla || 'N/A'}</span>
-                          {p.color && <span className="text-zinc-500"> • {p.color}</span>}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-zinc-200 font-semibold px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[11px]">
+                              {p.talla || 'N/A'}
+                            </span>
+                            {p.color && (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-700 text-[11px] text-zinc-300">
+                                {p.colorHex && (
+                                  <span 
+                                    className="w-2.5 h-2.5 rounded-full border border-white/20 shrink-0" 
+                                    style={{ backgroundColor: p.colorHex }} 
+                                  />
+                                )}
+                                <span>{p.color}</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Precio */}
@@ -315,6 +390,7 @@ export const AdminProductsPage: React.FC = () => {
         isOpen={isFormModalOpen}
         productToEdit={productToEdit}
         categories={categories}
+        branches={branches}
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveProduct}
       />

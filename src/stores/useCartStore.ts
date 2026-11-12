@@ -1,20 +1,29 @@
 import { create } from 'zustand';
-import type { Product, SaleItem } from '../types/domain';
+import type { Product, SaleItem, Customer } from '../types/domain';
 
 export interface CartItem {
   product: Product;
   quantity: number;
   subtotal: number;
+  talla?: string;
 }
 
 interface CartState {
   items: CartItem[];
   paymentMethod: 'EFECTIVO' | 'QR' | 'TARJETA';
-  addItem: (product: Product, quantity?: number) => { success: boolean; message?: string };
-  updateQuantity: (productId: string, quantity: number) => { success: boolean; message?: string };
-  removeItem: (productId: string) => void;
+  cliente: Customer | null;
+  descuentoPorcentaje: number;
+
+  addItem: (product: Product, quantity?: number, talla?: string) => { success: boolean; message?: string };
+  updateQuantity: (productId: string, quantity: number, talla?: string) => { success: boolean; message?: string };
+  removeItem: (productId: string, talla?: string) => void;
   clearCart: () => void;
   setPaymentMethod: (method: 'EFECTIVO' | 'QR' | 'TARJETA') => void;
+  setCliente: (cliente: Customer | null) => void;
+  setDescuentoPorcentaje: (pct: number) => void;
+
+  getSubtotal: () => number;
+  getDescuentoMonto: () => number;
   getTotal: () => number;
   getItemCount: () => number;
   toSaleItems: () => SaleItem[];
@@ -23,10 +32,15 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   paymentMethod: 'EFECTIVO',
+  cliente: null,
+  descuentoPorcentaje: 0,
 
-  addItem: (product: Product, quantity = 1) => {
+  addItem: (product: Product, quantity = 1, talla?: string) => {
     const { items } = get();
-    const existingIndex = items.findIndex(i => i.product.id === product.id);
+    const effectiveTalla = talla || product.talla || (product.tallas && product.tallas[0]) || 'ÚNICA';
+    const existingIndex = items.findIndex(
+      i => i.product.id === product.id && i.talla === effectiveTalla
+    );
 
     if (existingIndex > -1) {
       const existing = items[existingIndex];
@@ -59,7 +73,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       const newItem: CartItem = {
         product,
         quantity,
-        subtotal: quantity * product.precio
+        subtotal: quantity * product.precio,
+        talla: effectiveTalla
       };
 
       set({ items: [...items, newItem] });
@@ -67,14 +82,14 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  updateQuantity: (productId: string, quantity: number) => {
+  updateQuantity: (productId: string, quantity: number, talla?: string) => {
     const { items } = get();
     if (quantity <= 0) {
-      get().removeItem(productId);
+      get().removeItem(productId, talla);
       return { success: true };
     }
 
-    const item = items.find(i => i.product.id === productId);
+    const item = items.find(i => i.product.id === productId && (!talla || i.talla === talla));
     if (!item) return { success: false, message: 'Producto no encontrado en carrito' };
 
     if (quantity > item.product.stock) {
@@ -86,7 +101,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     set({
       items: items.map(i =>
-        i.product.id === productId
+        i.product.id === productId && (!talla || i.talla === talla)
           ? { ...i, quantity, subtotal: quantity * i.product.precio }
           : i
       )
@@ -94,20 +109,45 @@ export const useCartStore = create<CartState>((set, get) => ({
     return { success: true };
   },
 
-  removeItem: (productId: string) => {
-    set({ items: get().items.filter(i => i.product.id !== productId) });
+  removeItem: (productId: string, talla?: string) => {
+    set({
+      items: get().items.filter(i => !(i.product.id === productId && (!talla || i.talla === talla)))
+    });
   },
 
   clearCart: () => {
-    set({ items: [], paymentMethod: 'EFECTIVO' });
+    set({ items: [], paymentMethod: 'EFECTIVO', cliente: null, descuentoPorcentaje: 0 });
   },
 
   setPaymentMethod: (method) => {
     set({ paymentMethod: method });
   },
 
-  getTotal: () => {
+  setCliente: (cliente) => {
+    set({
+      cliente,
+      descuentoPorcentaje: cliente?.descuentoFrecuente || 0
+    });
+  },
+
+  setDescuentoPorcentaje: (pct) => {
+    set({ descuentoPorcentaje: Math.max(0, Math.min(100, pct)) });
+  },
+
+  getSubtotal: () => {
     return get().items.reduce((sum, item) => sum + item.subtotal, 0);
+  },
+
+  getDescuentoMonto: () => {
+    const sub = get().getSubtotal();
+    const pct = get().descuentoPorcentaje;
+    return (sub * pct) / 100;
+  },
+
+  getTotal: () => {
+    const sub = get().getSubtotal();
+    const desc = get().getDescuentoMonto();
+    return Math.max(0, sub - desc);
   },
 
   getItemCount: () => {
@@ -120,7 +160,9 @@ export const useCartStore = create<CartState>((set, get) => ({
       nombreProducto: i.product.nombre,
       cantidad: i.quantity,
       precioUnitario: i.product.precio,
-      subtotal: i.subtotal
+      subtotal: i.subtotal,
+      talla: i.talla,
+      color: i.product.color
     }));
   }
 }));

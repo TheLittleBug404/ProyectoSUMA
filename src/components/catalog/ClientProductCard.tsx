@@ -78,11 +78,27 @@ export const ClientProductCard: React.FC<ClientProductCardProps> = ({
           <span className="font-mono text-base font-bold text-amber-400">
             Bs. {product.precio.toFixed(2)}
           </span>
-          {product.talla && (
-            <span className="text-[10px] font-medium text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700">
-              Talla: {product.talla}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {product.color && (
+              <span 
+                title={`Color: ${product.color}`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-300"
+              >
+                {product.colorHex && (
+                  <span 
+                    className="w-2 h-2 rounded-full border border-white/20 shrink-0" 
+                    style={{ backgroundColor: product.colorHex }} 
+                  />
+                )}
+                <span className="max-w-[65px] truncate">{product.color}</span>
+              </span>
+            )}
+            {product.talla && (
+              <span className="text-[10px] font-medium text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700">
+                {product.talla}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

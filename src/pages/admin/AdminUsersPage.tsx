@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Users, Edit2, ShieldCheck, UserCheck, RefreshCw, Power } from 'lucide-react';
-import type { User } from '../../types/domain';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Plus, Users, Edit2, ShieldCheck, UserCheck, RefreshCw, Power, Trash2 } from 'lucide-react';
+import type { User, Branch } from '../../types/domain';
 import { userRepository } from '../../repositories/dexie/DexieUserRepository';
+import { branchRepository } from '../../repositories/dexie/DexieBranchRepository';
 import { UserFormModal } from '../../components/admin/UserFormModal';
+import { db } from '../../db/dexie';
 
 export const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal
@@ -15,14 +18,22 @@ export const AdminUsersPage: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await userRepository.getAll();
-      setUsers(data);
+      const [userData, branchData] = await Promise.all([
+        userRepository.getAll(),
+        branchRepository.getAll()
+      ]);
+      setUsers(userData);
+      setBranches(branchData);
     } catch (err) {
-      console.error('Error cargando usuarios:', err);
+      console.error('Error cargando usuarios y sucursales:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const branchMap = useMemo(() => {
+    return new Map(branches.map(b => [b.id, b]));
+  }, [branches]);
 
   useEffect(() => {
     loadData();
@@ -43,6 +54,25 @@ export const AdminUsersPage: React.FC = () => {
 
     if (window.confirm(`¿Deseas ${actionText} la cuenta de "${user.nombre}"?`)) {
       await userRepository.update(user.id, { activo: newStatus });
+      await loadData();
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (user.rol === 'ADMINISTRADOR' && users.filter(u => u.rol === 'ADMINISTRADOR' && u.activo).length <= 1) {
+      alert('No se puede eliminar el único administrador del sistema.');
+      return;
+    }
+
+    if (window.confirm(`¿Deseas eliminar al usuario "${user.nombre}"?`)) {
+      const salesCount = await db.ventas.where('empleadoId').equals(user.id).count();
+      if (salesCount > 0) {
+        if (window.confirm(`Este usuario tiene ${salesCount} ventas registradas. Para preservar el historial contable se desactivará su cuenta. ¿Continuar?`)) {
+          await userRepository.delete(user.id);
+        }
+      } else {
+        await db.usuarios.delete(user.id);
+      }
       await loadData();
     }
   };
@@ -96,6 +126,7 @@ export const AdminUsersPage: React.FC = () => {
                 <tr className="bg-[#181820] border-b border-zinc-800 text-zinc-400 uppercase text-[10px] tracking-wider font-bold">
                   <th className="py-3.5 px-4">Nombre / Email</th>
                   <th className="py-3.5 px-4">Rol</th>
+                  <th className="py-3.5 px-4">Sueldo Base</th>
                   <th className="py-3.5 px-4">Sucursal</th>
                   <th className="py-3.5 px-4">Estado</th>
                   <th className="py-3.5 px-4 text-right">Acciones</th>
@@ -104,13 +135,13 @@ export const AdminUsersPage: React.FC = () => {
               <tbody className="divide-y divide-zinc-800/60">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-zinc-400">
+                    <td colSpan={6} className="py-12 text-center text-zinc-400">
                       Cargando personal...
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-zinc-500">
+                    <td colSpan={6} className="py-12 text-center text-zinc-500">
                       No hay usuarios registrados.
                     </td>
                   </tr>
@@ -138,8 +169,18 @@ export const AdminUsersPage: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="py-3.5 px-4 text-zinc-300">
-                        Principal
+                      <td className="py-3.5 px-4">
+                        {u.sueldo !== undefined && u.sueldo !== null ? (
+                          <span className="font-mono font-bold text-amber-300 text-xs">
+                            Bs. {Number(u.sueldo).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-500 text-[11px] italic">No asignado</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-zinc-300 font-medium">
+                        {branchMap.get(u.sucursalId)?.nombre || 'Sucursal Principal'}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -172,11 +213,19 @@ export const AdminUsersPage: React.FC = () => {
                             title={u.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                               u.activo
-                                ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400'
+                                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400'
                                 : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400'
                             }`}
                           >
                             <Power className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteUser(u)}
+                            title="Eliminar usuario"
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -192,6 +241,7 @@ export const AdminUsersPage: React.FC = () => {
       <UserFormModal
         isOpen={isModalOpen}
         userToEdit={userToEdit}
+        branches={branches}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveUser}
       />

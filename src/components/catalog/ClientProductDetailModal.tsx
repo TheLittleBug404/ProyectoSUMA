@@ -104,7 +104,15 @@ export const ClientProductDetailModal: React.FC<ClientProductDetailModalProps> =
                 </div>
                 <div>
                   <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">Color</span>
-                  <span className="text-sm font-semibold text-zinc-100">{product.color || 'Único'}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {product.colorHex && (
+                      <span 
+                        className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0 shadow-sm" 
+                        style={{ backgroundColor: product.colorHex }} 
+                      />
+                    )}
+                    <span className="text-sm font-semibold text-zinc-100">{product.color || 'Único'}</span>
+                  </div>
                 </div>
               </div>
             </div>

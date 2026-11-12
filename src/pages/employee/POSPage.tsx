@@ -11,27 +11,40 @@ import {
   AlertCircle, 
   ShoppingBag, 
   Sparkles,
-  Barcode
+  Barcode,
+  RotateCcw,
+  UserCheck,
+  Percent,
+  X
 } from 'lucide-react';
-import type { Product, Category, Sale } from '../../types/domain';
+import type { Product, Category, Sale, Customer } from '../../types/domain';
 import { productRepository } from '../../repositories/dexie/DexieProductRepository';
 import { categoryRepository } from '../../repositories/dexie/DexieCategoryRepository';
 import { saleRepository } from '../../repositories/dexie/DexieSaleRepository';
+import { branchRepository } from '../../repositories/dexie/DexieBranchRepository';
+import { customerRepository } from '../../repositories/dexie/DexieCustomerRepository';
 import { useCartStore } from '../../stores/useCartStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { QRScannerModal } from '../../components/pos/QRScannerModal';
 import { TicketReceiptModal } from '../../components/pos/TicketReceiptModal';
+import { ReturnExchangeModal } from '../../components/pos/ReturnExchangeModal';
 
 export const POSPage: React.FC = () => {
   const { user } = useAuthStore();
   const {
     items,
     paymentMethod,
+    cliente,
+    descuentoPorcentaje,
     addItem,
     updateQuantity,
     removeItem,
     clearCart,
     setPaymentMethod,
+    setCliente,
+    setDescuentoPorcentaje,
+    getSubtotal,
+    getDescuentoMonto,
     getTotal,
     getItemCount,
     toSaleItems
@@ -39,7 +52,12 @@ export const POSPage: React.FC = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [branchName, setBranchName] = useState<string>('Sucursal Principal');
   const [loading, setLoading] = useState(true);
+
+  // Selected size per product card
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
 
   // Filters for left catalog
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +70,7 @@ export const POSPage: React.FC = () => {
 
   // Modals
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [saleError, setSaleError] = useState('');
@@ -62,12 +81,17 @@ export const POSPage: React.FC = () => {
   const loadInventory = async () => {
     try {
       setLoading(true);
-      const [prods, cats] = await Promise.all([
-        productRepository.getAll({ soloActivos: true }),
-        categoryRepository.getAll()
+      const sucursalFiltro = user?.rol === 'ADMINISTRADOR' ? undefined : (user?.sucursalId || 'sucursal-principal-01');
+      const [prods, cats, branch, custs] = await Promise.all([
+        productRepository.getAll({ soloActivos: true, sucursalId: sucursalFiltro }),
+        categoryRepository.getAll(),
+        user?.sucursalId ? branchRepository.getById(user.sucursalId) : undefined,
+        customerRepository.getAll()
       ]);
       setProducts(prods);
       setCategories(cats);
+      setCustomers(custs);
+      if (branch) setBranchName(branch.nombre);
     } catch (err) {
       console.error('Error cargando inventario en POS:', err);
     } finally {
@@ -119,12 +143,13 @@ export const POSPage: React.FC = () => {
       return { success: false, message: `"${product.nombre}" está agotado` };
     }
 
-    const res = addItem(product);
+    const chosenSize = selectedSizes[product.id] || product.tallas?.[0] || product.talla || 'ÚNICA';
+    const res = addItem(product, 1, chosenSize);
     if (!res.success) {
       return { success: false, message: res.message };
     }
 
-    return { success: true, message: `Agregado: ${product.nombre}` };
+    return { success: true, message: `Agregado: ${product.nombre} (${chosenSize})` };
   };
 
   // Submit barcode from text input (or laser USB scanner)
@@ -154,10 +179,19 @@ export const POSPage: React.FC = () => {
       const saleData = {
         numeroTicket: `TICK-${Date.now().toString().slice(-6)}`,
         empleadoId: user.id,
+        empleadoNombre: user.nombre,
         sucursalId: user.sucursalId || 'sucursal-principal-01',
+        sucursalNombre: branchName,
         items: toSaleItems(),
+        subtotal: getSubtotal(),
+        descuentoPorcentaje: descuentoPorcentaje,
+        descuentoMonto: getDescuentoMonto(),
         total: getTotal(),
-        metodoPago: paymentMethod
+        metodoPago: paymentMethod,
+        clienteId: cliente?.id,
+        clienteNombre: cliente?.nombre,
+        clienteTelefono: cliente?.telefono,
+        clienteDocumento: cliente?.documento
       };
 
       const newSale = await saleRepository.createSale(saleData);
@@ -177,6 +211,8 @@ export const POSPage: React.FC = () => {
   };
 
   const total = getTotal();
+  const subtotal = getSubtotal();
+  const descuentoMonto = getDescuentoMonto();
   const cashGivenNum = parseFloat(cashGiven) || 0;
   const changeDue = Math.max(0, cashGivenNum - total);
 
@@ -194,15 +230,24 @@ export const POSPage: React.FC = () => {
                 Terminal Punto de Venta (POS)
               </h1>
               <p className="text-xs text-zinc-400">
-                Cajero: <span className="text-amber-300 font-semibold">{user?.nombre}</span> • Sucursal Principal
+                Cajero: <span className="text-amber-300 font-semibold">{user?.nombre}</span> • <span className="text-zinc-300">{branchName}</span>
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* Button: Return and Exchange Modal */}
+          <button
+            onClick={() => setIsReturnModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-pink-300 bg-pink-500/15 hover:bg-pink-500/25 border border-pink-500/30 transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Devoluciones / Cambios</span>
+          </button>
+
           {/* Barcode USB Gun scanner input */}
-          <form onSubmit={handleBarcodeSubmit} className="relative flex-1 sm:w-64">
+          <form onSubmit={handleBarcodeSubmit} className="relative flex-1 sm:w-60">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 pointer-events-none flex items-center">
               <Barcode className="w-4 h-4" />
             </span>
@@ -284,8 +329,11 @@ export const POSPage: React.FC = () => {
               </div>
             ) : (
               filteredProducts.map((p) => {
-                const inCartItem = items.find(i => i.product.id === p.id);
-                const remainingStock = p.stock - (inCartItem?.quantity || 0);
+                const inCartItems = items.filter(i => i.product.id === p.id);
+                const totalInCart = inCartItems.reduce((acc, curr) => acc + curr.quantity, 0);
+                const remainingStock = p.stock - totalInCart;
+                const availableSizes = p.tallas && p.tallas.length > 0 ? p.tallas : (p.talla ? [p.talla] : ['ÚNICA']);
+                const currentPickedSize = selectedSizes[p.id] || availableSizes[0];
 
                 return (
                   <div
@@ -306,13 +354,49 @@ export const POSPage: React.FC = () => {
                           <span className="font-mono text-amber-400/90">{p.qrCode}</span>
                           <span>•</span>
                           <span>{categoryMap.get(p.categoriaId)}</span>
-                          {p.talla && (
+                          {p.color && (
                             <>
                               <span>•</span>
-                              <span className="text-zinc-300 font-semibold">{p.talla}</span>
+                              <span className="inline-flex items-center gap-1 text-zinc-300">
+                                {p.colorHex && (
+                                  <span 
+                                    className="w-2 h-2 rounded-full border border-white/20 shrink-0" 
+                                    style={{ backgroundColor: p.colorHex }} 
+                                  />
+                                )}
+                                <span>{p.color}</span>
+                              </span>
                             </>
                           )}
                         </div>
+
+                        {/* Tallas selector pills on product card */}
+                        {availableSizes.length > 1 ? (
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <span className="text-[10px] text-zinc-500">Talla:</span>
+                            {availableSizes.map(sz => (
+                              <button
+                                key={sz}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSizes(prev => ({ ...prev, [p.id]: sz }));
+                                }}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                                  currentPickedSize === sz
+                                    ? 'bg-amber-400 text-zinc-950 shadow'
+                                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                                }`}
+                              >
+                                {sz}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-zinc-500 mt-0.5">
+                            Talla: <span className="text-zinc-300 font-semibold">{availableSizes[0]}</span>
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -329,7 +413,7 @@ export const POSPage: React.FC = () => {
                       </div>
 
                       <button
-                        onClick={() => addItem(p)}
+                        onClick={() => addItem(p, 1, currentPickedSize)}
                         disabled={remainingStock <= 0}
                         className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-400/15 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
                       >
@@ -347,7 +431,7 @@ export const POSPage: React.FC = () => {
         <div className="lg:col-span-5 bg-[#121216] border border-[#d4af37]/30 rounded-2xl p-5 shadow-2xl flex flex-col justify-between">
           <div>
             {/* Cart Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold font-serif text-white">Prendas en Venta</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -364,6 +448,56 @@ export const POSPage: React.FC = () => {
               )}
             </div>
 
+            {/* Customer VIP Selector Section */}
+            <div className="mb-3 p-2.5 rounded-xl bg-[#181820] border border-zinc-800">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Cliente / Descuento VIP</span>
+                </label>
+                {cliente && (
+                  <button
+                    onClick={() => setCliente(null)}
+                    className="text-[10px] text-zinc-400 hover:text-red-400 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" /> Quitar
+                  </button>
+                )}
+              </div>
+
+              {cliente ? (
+                <div className="flex items-center justify-between p-1.5 rounded-lg bg-cyan-950/30 border border-cyan-500/30 text-xs">
+                  <div>
+                    <p className="font-bold text-cyan-200">{cliente.nombre}</p>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      {cliente.documento || cliente.telefono || 'Cliente Registrado'}
+                    </p>
+                  </div>
+                  {cliente.descuentoFrecuente ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {cliente.descuentoFrecuente}% OFF VIP
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const picked = customers.find(c => c.id === e.target.value);
+                    if (picked) setCliente(picked);
+                  }}
+                  className="w-full bg-black border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="">Cliente Ocasional / General</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre} {c.documento ? `(${c.documento})` : ''} {c.descuentoFrecuente ? `• ${c.descuentoFrecuente}% OFF` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             {/* Error banner if checkout failed */}
             {saleError && (
               <div className="mb-3 p-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
@@ -373,9 +507,9 @@ export const POSPage: React.FC = () => {
             )}
 
             {/* Cart Item List */}
-            <div className="max-h-[250px] overflow-y-auto space-y-2 pr-1 mb-4">
+            <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 mb-4">
               {items.length === 0 ? (
-                <div className="py-12 text-center text-zinc-500">
+                <div className="py-10 text-center text-zinc-500">
                   <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
                   <p className="text-xs font-semibold">El carrito está vacío</p>
                   <p className="text-[10px] text-zinc-600 mt-0.5">Escanea una etiqueta o selecciona del catálogo</p>
@@ -383,11 +517,18 @@ export const POSPage: React.FC = () => {
               ) : (
                 items.map((item) => (
                   <div
-                    key={item.product.id}
+                    key={`${item.product.id}-${item.talla || ''}`}
                     className="p-2.5 rounded-xl bg-[#18181f] border border-zinc-800 flex items-center justify-between gap-2"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-zinc-100 truncate">{item.product.nombre}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-bold text-zinc-100 truncate">{item.product.nombre}</p>
+                        {item.talla && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            {item.talla}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-zinc-400">
                         Bs. {item.product.precio.toFixed(2)} c/u
                       </p>
@@ -397,14 +538,14 @@ export const POSPage: React.FC = () => {
                       {/* Quantity stepper */}
                       <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-lg p-0.5">
                         <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.talla)}
                           className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.talla)}
                           disabled={item.quantity >= item.product.stock}
                           className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
                         >
@@ -417,7 +558,7 @@ export const POSPage: React.FC = () => {
                       </span>
 
                       <button
-                        onClick={() => removeItem(item.product.id)}
+                        onClick={() => removeItem(item.product.id, item.talla)}
                         className="text-zinc-500 hover:text-red-400 p-1 cursor-pointer transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -430,10 +571,10 @@ export const POSPage: React.FC = () => {
           </div>
 
           {/* Checkout & Payment Area */}
-          <div className="pt-4 border-t border-zinc-800 space-y-4">
+          <div className="pt-3 border-t border-zinc-800 space-y-3">
             {/* Payment Method Selector */}
             <div>
-              <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+              <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
                 Método de Pago
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -475,9 +616,29 @@ export const POSPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Discount row if applicable or adjustable */}
+            <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-[#181820] border border-zinc-800">
+              <span className="text-zinc-400 flex items-center gap-1">
+                <Percent className="w-3.5 h-3.5 text-amber-400" />
+                <span>Descuento Promocional:</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={descuentoPorcentaje || ''}
+                  onChange={(e) => setDescuentoPorcentaje(parseInt(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-12 bg-black border border-zinc-700 rounded px-1.5 py-0.5 text-right font-mono text-white text-xs focus:outline-none focus:border-amber-400"
+                />
+                <span className="text-zinc-400 text-xs">%</span>
+              </div>
+            </div>
+
             {/* Cash calculator helper if cash selected */}
             {paymentMethod === 'EFECTIVO' && total > 0 && (
-              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+              <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Efectivo Recibido:</span>
                   <input
@@ -499,9 +660,22 @@ export const POSPage: React.FC = () => {
               </div>
             )}
 
-            {/* Total and Checkout Action */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-baseline justify-between">
+            {/* Totals Breakdown and Checkout Action */}
+            <div className="space-y-2 pt-1">
+              {descuentoMonto > 0 && (
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-zinc-400">
+                    <span>Subtotal:</span>
+                    <span className="font-mono">Bs. {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-300">
+                    <span>Descuento ({descuentoPorcentaje}%):</span>
+                    <span className="font-mono">- Bs. {descuentoMonto.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-baseline justify-between pt-1 border-t border-zinc-800">
                 <span className="text-xs uppercase tracking-wider text-zinc-400 font-bold">Total a Cobrar</span>
                 <span className="text-2xl font-black font-mono text-amber-400">
                   Bs. {total.toFixed(2)}
@@ -534,11 +708,20 @@ export const POSPage: React.FC = () => {
         onScan={handleProcessCode}
       />
 
+      {/* Return & Exchange Modal */}
+      <ReturnExchangeModal
+        isOpen={isReturnModalOpen}
+        onClose={() => setIsReturnModalOpen(false)}
+        onSuccess={() => {
+          loadInventory();
+        }}
+      />
+
       {/* Ticket Receipt Modal on Sale Success */}
       <TicketReceiptModal
         sale={completedSale}
         cashierName={user?.nombre || 'Cajero'}
-        branchName="Principal"
+        branchName={branchName}
         onClose={() => setCompletedSale(null)}
       />
     </div>

@@ -1,19 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Search, Sparkles, Filter, SlidersHorizontal, RefreshCw } from 'lucide-react';
-import type { Product, Category } from '../../types/domain';
+import { Search, Sparkles, Filter, SlidersHorizontal, RefreshCw, Building2 } from 'lucide-react';
+import type { Product, Category, Branch } from '../../types/domain';
 import { productRepository } from '../../repositories/dexie/DexieProductRepository';
 import { categoryRepository } from '../../repositories/dexie/DexieCategoryRepository';
+import { branchRepository } from '../../repositories/dexie/DexieBranchRepository';
 import { ClientProductCard } from '../../components/catalog/ClientProductCard';
 import { ClientProductDetailModal } from '../../components/catalog/ClientProductDetailModal';
 
 export const CatalogPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedBranch, setSelectedBranch] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name'>('default');
 
   // Modal State
@@ -22,12 +25,14 @@ export const CatalogPage: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [prods, cats] = await Promise.all([
+      const [prods, cats, branchList] = await Promise.all([
         productRepository.getAll({ soloActivos: true }),
-        categoryRepository.getAll()
+        categoryRepository.getAll(),
+        branchRepository.getAll(true)
       ]);
       setProducts(prods);
       setCategories(cats);
+      setBranches(branchList);
     } catch (error) {
       console.error('Error cargando catálogo:', error);
     } finally {
@@ -63,6 +68,16 @@ export const CatalogPage: React.FC = () => {
       result = result.filter(p => p.categoriaId === selectedCategory);
     }
 
+    // Branch filter
+    if (selectedBranch !== 'all') {
+      result = result.filter(p => {
+        if (!p.sucursalesIds || p.sucursalesIds.length === 0) {
+          return !p.sucursalId || p.sucursalId === selectedBranch;
+        }
+        return p.sucursalesIds.includes('TODAS') || p.sucursalesIds.includes(selectedBranch);
+      });
+    }
+
     // Sort
     if (sortBy === 'price-low') {
       result.sort((a, b) => a.precio - b.precio);
@@ -73,7 +88,7 @@ export const CatalogPage: React.FC = () => {
     }
 
     return result;
-  }, [products, searchTerm, selectedCategory, sortBy]);
+  }, [products, searchTerm, selectedCategory, selectedBranch, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-zinc-100 pb-20">
@@ -113,19 +128,35 @@ export const CatalogPage: React.FC = () => {
             />
           </div>
 
-          {/* Sort Selector */}
-          <div className="flex items-center gap-3">
-            <SlidersHorizontal className="w-4 h-4 text-amber-400/70" />
-            <select
-              value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
-              className="bg-[#121216] border border-[#d4af37]/25 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-zinc-200 focus:outline-none focus:border-amber-400 transition-all cursor-pointer"
-            >
-              <option value="default">Orden por defecto</option>
-              <option value="price-low">Precio: Menor a Mayor</option>
-              <option value="price-high">Precio: Mayor a Menor</option>
-              <option value="name">Nombre: A - Z</option>
-            </select>
+          {/* Sede & Sort Selectors */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-[#121216] border border-[#d4af37]/25 rounded-xl px-2.5 py-1 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-amber-400/80" />
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="bg-transparent text-xs sm:text-sm text-zinc-200 focus:outline-none cursor-pointer"
+              >
+                <option value="all" className="bg-[#121216]">Todas las Sedes</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id} className="bg-[#121216]">{b.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-[#121216] border border-[#d4af37]/25 rounded-xl px-2.5 py-1 text-xs">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400/80" />
+              <select
+                value={sortBy}
+                onChange={(e: any) => setSortBy(e.target.value)}
+                className="bg-transparent text-xs sm:text-sm text-zinc-200 focus:outline-none cursor-pointer"
+              >
+                <option value="default" className="bg-[#121216]">Orden por defecto</option>
+                <option value="price-low" className="bg-[#121216]">Precio: Menor a Mayor</option>
+                <option value="price-high" className="bg-[#121216]">Precio: Mayor a Menor</option>
+                <option value="name" className="bg-[#121216]">Nombre: A - Z</option>
+              </select>
+            </div>
 
             <button
               onClick={loadData}
