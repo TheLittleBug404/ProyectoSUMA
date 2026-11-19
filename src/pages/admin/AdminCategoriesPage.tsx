@@ -5,8 +5,10 @@ import { categoryRepository } from '../../repositories/dexie/DexieCategoryReposi
 import { productRepository } from '../../repositories/dexie/DexieProductRepository';
 import { CategoryFormModal } from '../../components/admin/CategoryFormModal';
 import type { CategoryFormData } from '../../schemas/categorySchema';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const AdminCategoriesPage: React.FC = () => {
+  const { confirm, showAlert, showToast } = useModalStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,16 +53,32 @@ export const AdminCategoriesPage: React.FC = () => {
   const handleDeleteCategory = async (cat: Category) => {
     const count = getProductCount(cat.id);
     if (count > 0) {
-      alert(`No se puede eliminar la categoría "${cat.nombre}" porque tiene ${count} prenda(s) asignada(s). Reasigna las prendas primero.`);
+      await showAlert({
+        title: 'Categoría con prendas activas',
+        message: `No se puede eliminar la categoría "${cat.nombre}" porque tiene ${count} prenda(s) asignada(s).\n\nReasigna o elimina las prendas primero.`,
+        type: 'warning'
+      });
       return;
     }
 
-    if (window.confirm(`¿Seguro que deseas eliminar la categoría "${cat.nombre}"?`)) {
+    const ok = await confirm({
+      title: 'Eliminar Categoría',
+      message: `¿Estás seguro de que deseas eliminar la categoría "${cat.nombre}"?`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger'
+    });
+
+    if (ok) {
       try {
         await categoryRepository.delete(cat.id);
+        showToast(`Categoría "${cat.nombre}" eliminada con éxito`);
         await loadData();
       } catch (err: any) {
-        alert(err.message || 'Error al eliminar');
+        await showAlert({
+          title: 'Error al eliminar',
+          message: err.message || 'Error al eliminar la categoría',
+          type: 'error'
+        });
       }
     }
   };

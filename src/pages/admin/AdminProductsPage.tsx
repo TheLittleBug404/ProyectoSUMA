@@ -18,8 +18,10 @@ import { branchRepository } from '../../repositories/dexie/DexieBranchRepository
 import { ProductFormModal } from '../../components/admin/ProductFormModal';
 import { PrintQREtiquetteModal } from '../../components/admin/PrintQREtiquetteModal';
 import type { ProductFormData } from '../../schemas/productSchema';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const AdminProductsPage: React.FC = () => {
+  const { confirm, showToast } = useModalStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -107,6 +109,7 @@ export const AdminProductsPage: React.FC = () => {
         stockPorSucursal: data.stockPorSucursal,
         color: data.color,
         colorHex: data.colorHex,
+        colores: data.colores,
         sucursalesIds: data.sucursalesIds || ['TODAS'],
         qrCode: data.qrCode || productToEdit.qrCode,
         fotoUrl: data.fotoUrl,
@@ -124,6 +127,7 @@ export const AdminProductsPage: React.FC = () => {
         stockPorSucursal: data.stockPorSucursal,
         color: data.color,
         colorHex: data.colorHex,
+        colores: data.colores,
         sucursalesIds: data.sucursalesIds || ['TODAS'],
         qrCode: data.qrCode || `SAMU-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
         fotoUrl: data.fotoUrl,
@@ -137,8 +141,16 @@ export const AdminProductsPage: React.FC = () => {
   };
 
   const handleDeleteProduct = async (id: string, name: string) => {
-    if (window.confirm(`¿Estás seguro de desactivar la prenda "${name}"?`)) {
+    const ok = await confirm({
+      title: 'Desactivar Prenda',
+      message: `¿Estás seguro de que deseas desactivar la prenda "${name}" del catálogo?`,
+      confirmText: 'Sí, desactivar',
+      variant: 'danger'
+    });
+
+    if (ok) {
       await productRepository.delete(id);
+      showToast(`Prenda "${name}" desactivada`, 'info');
       await loadData();
     }
   };
@@ -148,7 +160,7 @@ export const AdminProductsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-[#121216] border border-[#d4af37]/25 p-5 rounded-2xl shadow-lg">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300">
               <Shirt className="w-5 h-5" />
             </div>
@@ -189,7 +201,7 @@ export const AdminProductsPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
@@ -261,7 +273,7 @@ export const AdminProductsPage: React.FC = () => {
                       <tr key={p.id} className="hover:bg-zinc-900/40 transition-colors">
                         {/* Prenda & Foto */}
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center">
                               <img src={imgUrl} alt={p.nombre} className="w-full h-full object-cover" />
                             </div>
@@ -305,20 +317,41 @@ export const AdminProductsPage: React.FC = () => {
 
                         {/* Talla / Color */}
                         <td className="py-3 px-4 text-zinc-400">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-zinc-200 font-semibold px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[11px]">
-                              {p.talla || 'N/A'}
-                            </span>
-                            {p.color && (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-700 text-[11px] text-zinc-300">
-                                {p.colorHex && (
-                                  <span 
-                                    className="w-2.5 h-2.5 rounded-full border border-white/20 shrink-0" 
-                                    style={{ backgroundColor: p.colorHex }} 
-                                  />
-                                )}
-                                <span>{p.color}</span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-zinc-200 font-semibold px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[11px]">
+                                {p.talla || 'N/A'}
                               </span>
+                              {!p.colores?.length && p.color && (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-700 text-[11px] text-zinc-300">
+                                  {p.colorHex && (
+                                    <span 
+                                      className="w-2.5 h-2.5 rounded-full border border-white/20 shrink-0" 
+                                      style={{ backgroundColor: p.colorHex }} 
+                                    />
+                                  )}
+                                  <span>{p.color}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {p.colores && p.colores.length > 0 && (
+                              <div className="flex items-center gap-1 flex-wrap mt-0.5 max-w-[200px]">
+                                {p.colores.map((c, i) => (
+                                  <span 
+                                    key={i} 
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-300"
+                                    title={`${c.color}: ${c.stock} unidades`}
+                                  >
+                                    <span 
+                                      className="w-2 h-2 rounded-full border border-white/20 shrink-0" 
+                                      style={{ backgroundColor: c.colorHex }} 
+                                    />
+                                    <span>{c.color}</span>
+                                    <span className="font-mono text-amber-400 font-bold">({c.stock})</span>
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </td>

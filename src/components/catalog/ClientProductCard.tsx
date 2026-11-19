@@ -79,7 +79,23 @@ export const ClientProductCard: React.FC<ClientProductCardProps> = ({
             Bs. {product.precio.toFixed(2)}
           </span>
           <div className="flex items-center gap-1.5">
-            {product.color && (
+            {product.colores && product.colores.length > 0 ? (
+              <div className="flex items-center -space-x-1" title={`${product.colores.length} colores disponibles`}>
+                {product.colores.slice(0, 4).map((c, i) => (
+                  <span
+                    key={i}
+                    className="w-3.5 h-3.5 rounded-full border border-black shrink-0 shadow-sm"
+                    style={{ backgroundColor: c.colorHex }}
+                    title={`${c.color} (${c.stock})`}
+                  />
+                ))}
+                {product.colores.length > 4 && (
+                  <span className="text-[9px] text-zinc-400 font-bold ml-1.5">
+                    +{product.colores.length - 4}
+                  </span>
+                )}
+              </div>
+            ) : product.color ? (
               <span 
                 title={`Color: ${product.color}`}
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-300"
@@ -92,7 +108,7 @@ export const ClientProductCard: React.FC<ClientProductCardProps> = ({
                 )}
                 <span className="max-w-[65px] truncate">{product.color}</span>
               </span>
-            )}
+            ) : null}
             {product.talla && (
               <span className="text-[10px] font-medium text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700">
                 {product.talla}

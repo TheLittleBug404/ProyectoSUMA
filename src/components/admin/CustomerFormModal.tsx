@@ -62,10 +62,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#121216] border border-[#d4af37]/30 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="bg-[#121216] border border-[#d4af37]/30 rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden shadow-2xl my-auto animate-scale-in">
         {/* Header */}
-        <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+        <div className="p-5 border-b border-zinc-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400">
               <UserCheck className="w-5 h-5" />
@@ -88,7 +88,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 overflow-y-auto flex-1">
           {/* Nombre */}
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1.5">

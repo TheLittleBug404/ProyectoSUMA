@@ -35,6 +35,11 @@ export class SAMUDatabase extends Dexie {
       clientes: 'id, documento, telefono, nombre, createdAt',
       devoluciones: 'id, ventaId, numeroTicketOriginal, empleadoId, sucursalId, fecha'
     });
+
+    // Esquema Version 4: Anulación de Ventas y Auditoría
+    this.version(4).stores({
+      ventas: 'id, &numeroTicket, empleadoId, sucursalId, fecha, total, estado, fechaAnulacion'
+    });
   }
 }
 

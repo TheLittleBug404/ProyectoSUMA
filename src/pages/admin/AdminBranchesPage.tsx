@@ -6,8 +6,10 @@ import { userRepository } from '../../repositories/dexie/DexieUserRepository';
 import { productRepository } from '../../repositories/dexie/DexieProductRepository';
 import { BranchFormModal } from '../../components/admin/BranchFormModal';
 import type { BranchFormData } from '../../schemas/branchSchema';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const AdminBranchesPage: React.FC = () => {
+  const { confirm, showToast } = useModalStore();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [userCounts, setUserCounts] = useState<Record<string, number>>({});
   const [productCounts, setProductCounts] = useState<Record<string, number>>({});
@@ -75,8 +77,16 @@ export const AdminBranchesPage: React.FC = () => {
     const newStatus = !branch.activa;
     const actionText = newStatus ? 'activar' : 'desactivar';
 
-    if (window.confirm(`¿Deseas ${actionText} la sucursal "${branch.nombre}"?`)) {
+    const ok = await confirm({
+      title: `${newStatus ? 'Activar' : 'Desactivar'} Sucursal`,
+      message: `¿Deseas ${actionText} la sucursal "${branch.nombre}"?`,
+      confirmText: newStatus ? 'Activar' : 'Desactivar',
+      variant: newStatus ? 'info' : 'warning'
+    });
+
+    if (ok) {
       await branchRepository.update(branch.id, { activa: newStatus });
+      showToast(`Sucursal "${branch.nombre}" ${newStatus ? 'activada' : 'desactivada'}`);
       await loadData();
     }
   };

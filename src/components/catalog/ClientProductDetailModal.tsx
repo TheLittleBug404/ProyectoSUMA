@@ -38,9 +38,9 @@ export const ClientProductDetailModal: React.FC<ClientProductDetailModalProps> =
   if (!product) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-2xl bg-[#121216] border border-[#d4af37]/30 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.2)] animate-scale-in"
+        className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto my-auto bg-[#121216] border border-[#d4af37]/30 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.2)] animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -96,25 +96,58 @@ export const ClientProductDetailModal: React.FC<ClientProductDetailModalProps> =
                 {product.descripcion}
               </p>
 
-              {/* Talla & Color */}
-              <div className="grid grid-cols-2 gap-3 mb-6 p-3 rounded-lg bg-zinc-900/70 border border-zinc-800">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">Talla</span>
-                  <span className="text-sm font-semibold text-zinc-100">{product.talla || 'Estándar'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">Color</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {product.colorHex && (
-                      <span 
-                        className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0 shadow-sm" 
-                        style={{ backgroundColor: product.colorHex }} 
-                      />
-                    )}
-                    <span className="text-sm font-semibold text-zinc-100">{product.color || 'Único'}</span>
+              {/* Talla & Color / Variantes */}
+              {product.colores && product.colores.length > 0 ? (
+                <div className="mb-6 p-3 rounded-lg bg-zinc-900/70 border border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+                      Talla: <span className="text-zinc-200 font-semibold">{product.talla || 'Estándar'}</span>
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">
+                      {product.colores.length} Colores Disponibles
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {product.colores.map((c, idx) => (
+                      <div
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-800/80 border border-zinc-700 text-xs"
+                      >
+                        <span 
+                          className="w-3 h-3 rounded-full border border-white/20 shrink-0 shadow-sm" 
+                          style={{ backgroundColor: c.colorHex }} 
+                        />
+                        <span className="font-semibold text-zinc-200">{c.color}</span>
+                        <span className={`text-[10px] font-mono px-1 rounded ${
+                          c.stock > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {c.stock} disp.
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 mb-6 p-3 rounded-lg bg-zinc-900/70 border border-zinc-800">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">Talla</span>
+                    <span className="text-sm font-semibold text-zinc-100">{product.talla || 'Estándar'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">Color</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {product.colorHex && (
+                        <span 
+                          className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0 shadow-sm" 
+                          style={{ backgroundColor: product.colorHex }} 
+                        />
+                      )}
+                      <span className="text-sm font-semibold text-zinc-100">{product.color || 'Único'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* QR Code Section */}

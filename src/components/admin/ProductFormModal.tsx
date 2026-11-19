@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X, Upload, Sparkles, Image as ImageIcon, Palette, Check, Building2 } from 'lucide-react';
+import { X, Upload, Sparkles, Image as ImageIcon, Palette, Check, Building2, Trash2 } from 'lucide-react';
 import { productSchema, type ProductFormData } from '../../schemas/productSchema';
-import type { Product, Category, Branch } from '../../types/domain';
+import type { Product, Category, Branch, ProductColorVariant } from '../../types/domain';
 
 export const TEXTILE_PALETTE = [
   { name: 'Negro', hex: '#111827' },
@@ -49,8 +49,48 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [selectedBranches, setSelectedBranches] = useState<string[]>(['TODAS']);
   const [selectedTallas, setSelectedTallas] = useState<string[]>(['M']);
   const [branchStocks, setBranchStocks] = useState<Record<string, number>>({});
+  const [colorVariants, setColorVariants] = useState<ProductColorVariant[]>([
+    { color: 'Negro', colorHex: '#111827', stock: 4 },
+    { color: 'Blanco', colorHex: '#FFFFFF', stock: 2 }
+  ]);
 
   const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'ÚNICA'];
+
+  const handleToggleColorVariant = (swatch: { name: string; hex: string }) => {
+    const existingIndex = colorVariants.findIndex(
+      c => c.color.toLowerCase() === swatch.name.toLowerCase() || c.colorHex.toLowerCase() === swatch.hex.toLowerCase()
+    );
+
+    if (existingIndex > -1) {
+      if (colorVariants.length > 1) {
+        const next = colorVariants.filter((_, idx) => idx !== existingIndex);
+        setColorVariants(next);
+        const sum = next.reduce((acc, c) => acc + (Number(c.stock) || 0), 0);
+        setValue('stock', sum);
+      }
+    } else {
+      const next = [...colorVariants, { color: swatch.name, colorHex: swatch.hex, stock: 2 }];
+      setColorVariants(next);
+      const sum = next.reduce((acc, c) => acc + (Number(c.stock) || 0), 0);
+      setValue('stock', sum);
+    }
+  };
+
+  const handleUpdateColorStock = (index: number, stockValue: number) => {
+    const next = [...colorVariants];
+    next[index] = { ...next[index], stock: Math.max(0, stockValue) };
+    setColorVariants(next);
+    const sum = next.reduce((acc, c) => acc + (Number(c.stock) || 0), 0);
+    setValue('stock', sum);
+  };
+
+  const handleRemoveColorVariant = (index: number) => {
+    if (colorVariants.length <= 1) return;
+    const next = colorVariants.filter((_, idx) => idx !== index);
+    setColorVariants(next);
+    const sum = next.reduce((acc, c) => acc + (Number(c.stock) || 0), 0);
+    setValue('stock', sum);
+  };
 
   const {
     register,
@@ -81,6 +121,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             : (productToEdit.talla ? [productToEdit.talla] : ['M'])
         );
         setBranchStocks(productToEdit.stockPorSucursal || {});
+        if (productToEdit.colores && productToEdit.colores.length > 0) {
+          setColorVariants(productToEdit.colores);
+        } else {
+          setColorVariants([
+            {
+              color: productToEdit.color || 'Negro',
+              colorHex: productToEdit.colorHex || '#111827',
+              stock: productToEdit.stock || 10
+            }
+          ]);
+        }
         reset({
           nombre: productToEdit.nombre,
           descripcion: productToEdit.descripcion,
@@ -109,6 +160,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setSelectedBranches(['TODAS']);
         setSelectedTallas(['S', 'M', 'L']);
         setBranchStocks({});
+        setColorVariants([
+          { color: 'Negro', colorHex: '#111827', stock: 4 },
+          { color: 'Blanco', colorHex: '#FFFFFF', stock: 2 }
+        ]);
         const autoCode = `SAMU-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
         reset({
           nombre: '',
@@ -148,8 +203,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const onSubmit = async (data: ProductFormData) => {
     try {
       setIsSubmitting(true);
+      const totalCalculatedStock = colorVariants.reduce((acc, c) => acc + (Number(c.stock) || 0), 0);
       await onSave({
         ...data,
+        stock: totalCalculatedStock,
+        colores: colorVariants,
+        color: colorVariants.map(c => c.color).join(', '),
+        colorHex: colorVariants[0]?.colorHex || '#111827',
         tallas: selectedTallas,
         talla: selectedTallas.join(', '),
         stockPorSucursal: Object.keys(branchStocks).length > 0 ? branchStocks : undefined,
@@ -200,56 +260,48 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               {/* ================= COLUMNA IZQUIERDA: Paleta de Colores + Fotografía debajo ================= */}
               <div className="md:col-span-5 space-y-4">
                 
-                {/* 1. Paleta Interactiva de Colores */}
+                {/* 1. Paleta Interactiva de Colores y Stock por Color */}
                 <div className="bg-[#16161d] border border-zinc-800 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-md">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Palette className="w-4 h-4 text-amber-400" />
                       <label className="text-xs font-bold text-white tracking-wide">
-                        Paleta de Colores *
+                        Paleta de Colores & Stock *
                       </label>
                     </div>
-                    {/* Live Color Badge */}
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-700 shrink-0">
-                      <span 
-                        className="w-3 h-3 rounded-full border border-white/20 shadow-sm shrink-0"
-                        style={{ backgroundColor: watchedColorHex || '#111827' }} 
-                      />
-                      <span className="text-[11px] font-semibold text-zinc-200 truncate max-w-[90px]">
-                        {watchedColor || 'Negro'}
-                      </span>
-                    </div>
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                      {colorVariants.length} {colorVariants.length === 1 ? 'color' : 'colores'} seleccionados
+                    </span>
                   </div>
 
                   {/* Swatches Grid Responsivo */}
                   <div>
                     <p className="text-[10px] text-zinc-400 mb-2">
-                      Toca un color para asignarlo a la prenda:
+                      Toca los colores que tiene este modelo para agregarlos:
                     </p>
                     <div className="flex flex-wrap gap-2 items-center">
                       {TEXTILE_PALETTE.map((swatch) => {
-                        const isSelected = (watchedColorHex || '').toLowerCase() === swatch.hex.toLowerCase();
+                        const isIncluded = colorVariants.some(
+                          c => c.color.toLowerCase() === swatch.name.toLowerCase() || c.colorHex.toLowerCase() === swatch.hex.toLowerCase()
+                        );
 
                         return (
                           <button
                             type="button"
                             key={swatch.hex}
-                            onClick={() => {
-                              setValue('color', swatch.name, { shouldValidate: true });
-                              setValue('colorHex', swatch.hex, { shouldValidate: true });
-                            }}
-                            title={`${swatch.name} (${swatch.hex})`}
-                            className={`group relative w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-full transition-transform hover:scale-110 flex items-center justify-center cursor-pointer shadow-md ${
+                            onClick={() => handleToggleColorVariant(swatch)}
+                            title={`${swatch.name} (${swatch.hex}) - Clic para agregar/quitar`}
+                            className={`group relative w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-all hover:scale-110 flex items-center justify-center cursor-pointer shadow-md ${
                               swatch.isLight ? 'border border-zinc-400/50' : 'border border-white/10'
                             } ${
-                              isSelected 
+                              isIncluded 
                                 ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-[#16161d] scale-110' 
-                                : 'hover:ring-1 hover:ring-zinc-400'
+                                : 'hover:ring-1 hover:ring-zinc-400 opacity-60 hover:opacity-100'
                             }`}
                             style={{ backgroundColor: swatch.hex }}
                           >
-                            {isSelected && (
-                              <Check className={`w-3.5 h-3.5 ${swatch.isLight ? 'text-zinc-900' : 'text-white'}`} />
+                            {isIncluded && (
+                              <Check className={`w-4 h-4 ${swatch.isLight ? 'text-zinc-900' : 'text-white'} font-bold`} />
                             )}
                           </button>
                         );
@@ -258,14 +310,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       {/* Selector Libre / Rueda Hex */}
                       <div className="flex items-center gap-1.5 pl-1.5 border-l border-zinc-700">
                         <label 
-                          title="Seleccionar color libre con cuentagotas"
-                          className="relative w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-full border border-zinc-600 overflow-hidden cursor-pointer flex items-center justify-center bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400 hover:scale-110 transition-transform shadow"
+                          title="Seleccionar tono personalizado"
+                          className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-zinc-600 overflow-hidden cursor-pointer flex items-center justify-center bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400 hover:scale-110 transition-transform shadow"
                         >
                           <input
                             type="color"
-                            value={watchedColorHex || '#111827'}
+                            value="#D97706"
                             onChange={(e) => {
-                              setValue('colorHex', e.target.value, { shouldValidate: true });
+                              const hex = e.target.value.toUpperCase();
+                              handleToggleColorVariant({ name: `Tono ${hex}`, hex });
                             }}
                             className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                           />
@@ -275,29 +328,56 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Inputs Nombre & Hex */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/80">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-zinc-400 mb-1">
-                        Nombre Tono
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="ej: Vinotinto"
-                        {...register('color')}
-                        className="w-full bg-[#18181f] border border-zinc-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                      />
+                  {/* Lista de Colores Seleccionados con Cantidad Individual */}
+                  <div className="pt-2 border-t border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-white">Cantidades por Color:</span>
+                      <span className="text-[11px] font-mono text-amber-300 font-bold">
+                        Total: {colorVariants.reduce((sum, c) => sum + (Number(c.stock) || 0), 0)} prendas
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-zinc-400 mb-1">
-                        Código HEX
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="#000000"
-                        {...register('colorHex')}
-                        className="w-full bg-[#18181f] border border-zinc-700 rounded-xl px-2.5 py-1.5 text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-400 uppercase"
-                      />
+
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                      {colorVariants.map((variant, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center justify-between p-2 rounded-xl bg-[#181820] border border-zinc-800 gap-2 hover:border-zinc-700 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span 
+                              className="w-4 h-4 rounded-full border border-white/20 shrink-0 shadow"
+                              style={{ backgroundColor: variant.colorHex }}
+                            />
+                            <span className="text-xs text-zinc-200 font-medium truncate">
+                              {variant.color}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-zinc-400">Cant:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={variant.stock}
+                                onChange={(e) => handleUpdateColorStock(idx, parseInt(e.target.value) || 0)}
+                                className="w-16 bg-black border border-zinc-700 rounded-lg px-2 py-1 text-right text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-400"
+                              />
+                            </div>
+
+                            {colorVariants.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveColorVariant(idx)}
+                                className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
+                                title="Quitar este color"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

@@ -161,7 +161,7 @@ export async function exportSalesToCSV(): Promise<void> {
   const ventas = await db.ventas.toArray();
   const sorted = ventas.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-  const headers = ['Nº Ticket', 'Fecha', 'Hora', 'Sucursal', 'Cajero', 'Cliente', 'Doc Cliente', 'Subtotal (Bs)', 'Descuento (Bs)', 'Total (Bs)', 'Método de Pago', 'Prendas Vendidas'];
+  const headers = ['Nº Ticket', 'Fecha', 'Hora', 'Sucursal', 'Cajero', 'Cliente', 'Doc Cliente', 'Estado', 'Motivo Anulación', 'Subtotal (Bs)', 'Descuento (Bs)', 'Total (Bs)', 'Método de Pago', 'Prendas Vendidas'];
   const rows = sorted.map(v => {
     const fechaObj = new Date(v.fecha);
     const fechaStr = fechaObj.toLocaleDateString('es-BO');
@@ -176,6 +176,8 @@ export async function exportSalesToCSV(): Promise<void> {
       `"${v.empleadoNombre || 'Cajero'}"`,
       `"${v.clienteNombre || 'Cliente General'}"`,
       `"${v.clienteDocumento || '-'}"`,
+      `"${v.estado || 'COMPLETADA'}"`,
+      `"${v.motivoAnulacion || '-'}"`,
       (v.subtotal || v.total).toFixed(2),
       (v.descuentoMonto || 0).toFixed(2),
       v.total.toFixed(2),

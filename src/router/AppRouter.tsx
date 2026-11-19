@@ -13,6 +13,7 @@ import { AdminCashPage } from '../pages/admin/AdminCashPage';
 import { DashboardPage } from '../pages/admin/DashboardPage';
 import { BackupPage } from '../pages/admin/BackupPage';
 import { AdminCustomersPage } from '../pages/admin/AdminCustomersPage';
+import { GlobalModalContainer } from '../components/common/GlobalModalContainer';
 
 // Layout que incluye la barra de navegación superior
 const AppLayout: React.FC = () => {
@@ -33,6 +34,7 @@ const AppLayout: React.FC = () => {
 export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
+      <GlobalModalContainer />
       <Routes>
         {/* Ruta Login sin layout */}
         <Route path="/login" element={<LoginPage />} />

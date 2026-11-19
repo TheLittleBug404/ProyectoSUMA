@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { PlusCircle, Save, Trash2, Edit2, RotateCcw, Shirt, Users, MapPin, TrendingUp, Tag, LayoutDashboard } from 'lucide-react';
 import type { Product, Worker } from '../types';
 import samuLogo from '../assets/samu-logo.jpg';
+import { useModalStore } from '../stores/useModalStore';
 
 interface AdminPanelProps {
   products: Product[];
@@ -56,6 +57,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onEditWorker,
   onDeleteWorker,
 }) => {
+  const { confirm: modalConfirm, showAlert } = useModalStore();
   // Tabs: 'catalog' | 'stats'
   const [adminTab, setAdminTab] = useState<'catalog' | 'stats'>('catalog');
   
@@ -243,15 +245,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setImageUrl(p.imageUrl);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (selectedColors.length === 0) {
-      alert('Por favor seleccione al menos un color.');
+      await showAlert({ title: 'Campo Requerido', message: 'Por favor seleccione al menos un color.', type: 'warning' });
       return;
     }
     if (selectedSizes.length === 0) {
-      alert('Por favor seleccione al menos una talla.');
+      await showAlert({ title: 'Campo Requerido', message: 'Por favor seleccione al menos una talla.', type: 'warning' });
       return;
     }
 
@@ -259,11 +261,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const pw = parseFloat(priceWholesale);
 
     if (isNaN(pr) || pr <= 0) {
-      alert('Ingrese un precio por menor válido.');
+      await showAlert({ title: 'Precio Inválido', message: 'Ingrese un precio por menor válido.', type: 'warning' });
       return;
     }
     if (isNaN(pw) || pw <= 0) {
-      alert('Ingrese un precio por mayor válido.');
+      await showAlert({ title: 'Precio Inválido', message: 'Ingrese un precio por mayor válido.', type: 'warning' });
       return;
     }
 
@@ -316,15 +318,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setWorkerStatus(w.status);
   };
 
-  const handleWorkerSave = (e: React.FormEvent) => {
+  const handleWorkerSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!workerName.trim()) {
-      alert('Ingrese el nombre del trabajador.');
+      await showAlert({ title: 'Campo Requerido', message: 'Ingrese el nombre del trabajador.', type: 'warning' });
       return;
     }
     if (!workerRole.trim()) {
-      alert('Ingrese el cargo o rol del trabajador.');
+      await showAlert({ title: 'Campo Requerido', message: 'Ingrese el cargo o rol del trabajador.', type: 'warning' });
       return;
     }
 
@@ -767,8 +769,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Edit2 size={14} />
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm(`¿Eliminar la prenda "${p.name}"?`)) {
+                      onClick={async () => {
+                        const ok = await modalConfirm({
+                          title: 'Eliminar Prenda',
+                          message: `¿Eliminar la prenda "${p.name}"?`,
+                          confirmText: 'Sí, eliminar',
+                          variant: 'danger'
+                        });
+                        if (ok) {
                           onDeleteProduct(p.id);
                           if (editingId === p.id) resetForm();
                         }
@@ -1146,8 +1154,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <Edit2 size={13} />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (confirm(`¿Quitar al empleado "${w.name}" de la nómina?`)) {
+                                onClick={async () => {
+                                  const ok = await modalConfirm({
+                                    title: 'Baja de Empleado',
+                                    message: `¿Quitar al empleado "${w.name}" de la nómina?`,
+                                    confirmText: 'Sí, dar de baja',
+                                    variant: 'danger'
+                                  });
+                                  if (ok) {
                                     onDeleteWorker(w.id);
                                     if (editingWorkerId === w.id) resetWorkerForm();
                                   }

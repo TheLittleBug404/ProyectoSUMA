@@ -63,11 +63,22 @@ export class DexieCashRepository implements ICashRepository {
     let totalVentasEfectivo = 0;
     let totalVentasQR = 0;
     let totalVentasTarjeta = 0;
+    let totalVentasAnuladasEfectivo = 0;
+    let totalVentasAnuladasMonto = 0;
+    let cantidadVentasAnuladas = 0;
+    let completedCount = 0;
 
     for (const sale of shiftSales) {
-      if (sale.metodoPago === 'EFECTIVO') totalVentasEfectivo += sale.total;
-      else if (sale.metodoPago === 'QR') totalVentasQR += sale.total;
-      else if (sale.metodoPago === 'TARJETA') totalVentasTarjeta += sale.total;
+      if (sale.estado === 'ANULADA') {
+        cantidadVentasAnuladas++;
+        totalVentasAnuladasMonto += sale.total;
+        if (sale.metodoPago === 'EFECTIVO') totalVentasAnuladasEfectivo += sale.total;
+      } else {
+        completedCount++;
+        if (sale.metodoPago === 'EFECTIVO') totalVentasEfectivo += sale.total;
+        else if (sale.metodoPago === 'QR') totalVentasQR += sale.total;
+        else if (sale.metodoPago === 'TARJETA') totalVentasTarjeta += sale.total;
+      }
     }
 
     const totalVentasGeneral = totalVentasEfectivo + totalVentasQR + totalVentasTarjeta;
@@ -98,7 +109,10 @@ export class DexieCashRepository implements ICashRepository {
       totalVentasQR,
       totalVentasTarjeta,
       totalVentasGeneral,
-      ventasCount: shiftSales.length,
+      ventasCount: completedCount,
+      totalVentasAnuladasEfectivo,
+      totalVentasAnuladasMonto,
+      cantidadVentasAnuladas,
       totalEgresos,
       egresosCount: shiftExpenses.length,
       montoEsperadoEfectivo
@@ -149,6 +163,9 @@ export class DexieCashRepository implements ICashRepository {
       montoEsperadoEfectivo: liveStats.montoEsperadoEfectivo,
       montoRealEfectivo,
       diferencia,
+      totalVentasAnuladasEfectivo: liveStats.totalVentasAnuladasEfectivo,
+      totalVentasAnuladasMonto: liveStats.totalVentasAnuladasMonto,
+      cantidadVentasAnuladas: liveStats.cantidadVentasAnuladas,
       notas: data.notas ? `${caja.notas || ''} | Cierre: ${data.notas}`.trim() : caja.notas
     };
 
@@ -232,11 +249,20 @@ export class DexieCashRepository implements ICashRepository {
     let totalVentasEfectivo = 0;
     let totalVentasQR = 0;
     let totalVentasTarjeta = 0;
+    let totalVentasAnuladas = 0;
+    let montoVentasAnuladas = 0;
+    let completedTickets = 0;
 
     for (const sale of periodSales) {
-      if (sale.metodoPago === 'EFECTIVO') totalVentasEfectivo += sale.total;
-      else if (sale.metodoPago === 'QR') totalVentasQR += sale.total;
-      else if (sale.metodoPago === 'TARJETA') totalVentasTarjeta += sale.total;
+      if (sale.estado === 'ANULADA') {
+        totalVentasAnuladas++;
+        montoVentasAnuladas += sale.total;
+      } else {
+        completedTickets++;
+        if (sale.metodoPago === 'EFECTIVO') totalVentasEfectivo += sale.total;
+        else if (sale.metodoPago === 'QR') totalVentasQR += sale.total;
+        else if (sale.metodoPago === 'TARJETA') totalVentasTarjeta += sale.total;
+      }
     }
 
     const totalIngresosVentas = totalVentasEfectivo + totalVentasQR + totalVentasTarjeta;
@@ -274,10 +300,12 @@ export class DexieCashRepository implements ICashRepository {
       totalVentasQR,
       totalVentasTarjeta,
       totalIngresosVentas,
+      totalVentasAnuladas,
+      montoVentasAnuladas,
       totalEgresos,
       balanceNeto: totalIngresosVentas - totalEgresos,
       cierresRealizados: periodRegisters.length,
-      ticketsCount: periodSales.length
+      ticketsCount: completedTickets
     };
   }
 }

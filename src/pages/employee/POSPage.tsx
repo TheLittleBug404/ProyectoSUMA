@@ -28,6 +28,8 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { QRScannerModal } from '../../components/pos/QRScannerModal';
 import { TicketReceiptModal } from '../../components/pos/TicketReceiptModal';
 import { ReturnExchangeModal } from '../../components/pos/ReturnExchangeModal';
+import { VoidSaleModal } from '../../components/pos/VoidSaleModal';
+import { Ban } from 'lucide-react';
 
 export const POSPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -58,6 +60,8 @@ export const POSPage: React.FC = () => {
 
   // Selected size per product card
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+  // Selected color per product card
+  const [selectedColors, setSelectedColors] = useState<Record<string, string>>({});
 
   // Filters for left catalog
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +75,7 @@ export const POSPage: React.FC = () => {
   // Modals
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [saleError, setSaleError] = useState('');
@@ -144,12 +149,27 @@ export const POSPage: React.FC = () => {
     }
 
     const chosenSize = selectedSizes[product.id] || product.tallas?.[0] || product.talla || 'ÚNICA';
-    const res = addItem(product, 1, chosenSize);
+    let chosenColor: string | undefined = selectedColors[product.id];
+    let chosenColorHex: string | undefined;
+
+    if (product.colores && product.colores.length > 0) {
+      const variant = product.colores.find(c => c.color === chosenColor) || product.colores.find(c => c.stock > 0) || product.colores[0];
+      chosenColor = variant.color;
+      chosenColorHex = variant.colorHex;
+    } else {
+      chosenColor = product.color;
+      chosenColorHex = product.colorHex;
+    }
+
+    const res = addItem(product, 1, chosenSize, chosenColor, chosenColorHex);
     if (!res.success) {
       return { success: false, message: res.message };
     }
 
-    return { success: true, message: `Agregado: ${product.nombre} (${chosenSize})` };
+    return { 
+      success: true, 
+      message: `Agregado: ${product.nombre} (${chosenSize}${chosenColor ? ` - ${chosenColor}` : ''})` 
+    };
   };
 
   // Submit barcode from text input (or laser USB scanner)
@@ -237,6 +257,15 @@ export const POSPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* Button: Void Sale Modal */}
+          <button
+            onClick={() => setIsVoidModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-300 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 transition-all cursor-pointer"
+          >
+            <Ban className="w-4 h-4" />
+            <span>Anular Venta</span>
+          </button>
+
           {/* Button: Return and Exchange Modal */}
           <button
             onClick={() => setIsReturnModalOpen(true)}
@@ -329,11 +358,23 @@ export const POSPage: React.FC = () => {
               </div>
             ) : (
               filteredProducts.map((p) => {
-                const inCartItems = items.filter(i => i.product.id === p.id);
-                const totalInCart = inCartItems.reduce((acc, curr) => acc + curr.quantity, 0);
-                const remainingStock = p.stock - totalInCart;
                 const availableSizes = p.tallas && p.tallas.length > 0 ? p.tallas : (p.talla ? [p.talla] : ['ÚNICA']);
                 const currentPickedSize = selectedSizes[p.id] || availableSizes[0];
+
+                const hasColorVariants = !!(p.colores && p.colores.length > 0);
+                const availableColors = hasColorVariants ? p.colores! : [];
+                const currentPickedColor = selectedColors[p.id] || (hasColorVariants ? availableColors[0].color : (p.color || ''));
+                const currentVariant = hasColorVariants 
+                  ? (availableColors.find(c => c.color === currentPickedColor) || availableColors[0])
+                  : null;
+                const currentPickedColorHex = currentVariant ? currentVariant.colorHex : (p.colorHex || '');
+
+                // Calcular stock restante considerando el color elegido si hay variantes
+                const variantStock = currentVariant ? currentVariant.stock : p.stock;
+                const inCartVariantCount = items
+                  .filter(i => i.product.id === p.id && (!currentPickedColor || i.color === currentPickedColor))
+                  .reduce((acc, curr) => acc + curr.quantity, 0);
+                const remainingStock = Math.max(0, variantStock - inCartVariantCount);
 
                 return (
                   <div
@@ -354,7 +395,7 @@ export const POSPage: React.FC = () => {
                           <span className="font-mono text-amber-400/90">{p.qrCode}</span>
                           <span>•</span>
                           <span>{categoryMap.get(p.categoriaId)}</span>
-                          {p.color && (
+                          {!hasColorVariants && p.color && (
                             <>
                               <span>•</span>
                               <span className="inline-flex items-center gap-1 text-zinc-300">
@@ -397,6 +438,45 @@ export const POSPage: React.FC = () => {
                             Talla: <span className="text-zinc-300 font-semibold">{availableSizes[0]}</span>
                           </p>
                         )}
+
+                        {/* Colores selector pills on product card */}
+                        {hasColorVariants && (
+                          <div className="flex items-center flex-wrap gap-1 mt-1.5">
+                            <span className="text-[10px] text-zinc-500">Color:</span>
+                            {availableColors.map(c => {
+                              const isSelected = (currentPickedColor === c.color);
+                              const inCartThis = items
+                                .filter(i => i.product.id === p.id && i.color === c.color)
+                                .reduce((sum, item) => sum + item.quantity, 0);
+                              const rem = Math.max(0, c.stock - inCartThis);
+
+                              return (
+                                <button
+                                  key={c.color}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedColors(prev => ({ ...prev, [p.id]: c.color }));
+                                  }}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-amber-400 text-zinc-950 font-bold shadow-sm'
+                                      : 'bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700'
+                                  }`}
+                                >
+                                  <span
+                                    className="w-2 h-2 rounded-full border border-black/30 shrink-0"
+                                    style={{ backgroundColor: c.colorHex }}
+                                  />
+                                  <span>{c.color}</span>
+                                  <span className={`text-[9px] font-mono ${isSelected ? 'text-zinc-900 font-bold' : (rem > 0 ? 'text-zinc-400' : 'text-red-400')}`}>
+                                    ({rem})
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -413,7 +493,7 @@ export const POSPage: React.FC = () => {
                       </div>
 
                       <button
-                        onClick={() => addItem(p, 1, currentPickedSize)}
+                        onClick={() => addItem(p, 1, currentPickedSize, currentPickedColor, currentPickedColorHex)}
                         disabled={remainingStock <= 0}
                         className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-400/15 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
                       >
@@ -515,57 +595,74 @@ export const POSPage: React.FC = () => {
                   <p className="text-[10px] text-zinc-600 mt-0.5">Escanea una etiqueta o selecciona del catálogo</p>
                 </div>
               ) : (
-                items.map((item) => (
-                  <div
-                    key={`${item.product.id}-${item.talla || ''}`}
-                    className="p-2.5 rounded-xl bg-[#18181f] border border-zinc-800 flex items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-bold text-zinc-100 truncate">{item.product.nombre}</p>
-                        {item.talla && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            {item.talla}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-zinc-400">
-                        Bs. {item.product.precio.toFixed(2)} c/u
-                      </p>
-                    </div>
+                items.map((item) => {
+                  const maxStock = item.color && item.product.colores?.length
+                    ? (item.product.colores.find(c => c.color.toLowerCase() === item.color?.toLowerCase())?.stock ?? item.product.stock)
+                    : item.product.stock;
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {/* Quantity stepper */}
-                      <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-lg p-0.5">
-                        <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.talla)}
-                          className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.talla)}
-                          disabled={item.quantity >= item.product.stock}
-                          className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
+                  return (
+                    <div
+                      key={`${item.product.id}-${item.talla || ''}-${item.color || ''}`}
+                      className="p-2.5 rounded-xl bg-[#18181f] border border-zinc-800 flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-bold text-zinc-100 truncate">{item.product.nombre}</p>
+                          {item.talla && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              {item.talla}
+                            </span>
+                          )}
+                          {item.color && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-zinc-800 text-zinc-200 border border-zinc-700">
+                              {item.colorHex && (
+                                <span 
+                                  className="w-1.5 h-1.5 rounded-full border border-white/20 shrink-0" 
+                                  style={{ backgroundColor: item.colorHex }} 
+                                />
+                              )}
+                              {item.color}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-400">
+                          Bs. {item.product.precio.toFixed(2)} c/u
+                        </p>
                       </div>
 
-                      <span className="text-xs font-bold font-mono text-amber-400 w-16 text-right">
-                        Bs. {item.subtotal.toFixed(2)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Quantity stepper */}
+                        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-lg p-0.5">
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.talla, item.color)}
+                            className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.talla, item.color)}
+                            disabled={item.quantity >= maxStock}
+                            className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-20 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
 
-                      <button
-                        onClick={() => removeItem(item.product.id, item.talla)}
-                        className="text-zinc-500 hover:text-red-400 p-1 cursor-pointer transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <span className="text-xs font-bold font-mono text-amber-400 w-16 text-right">
+                          Bs. {item.subtotal.toFixed(2)}
+                        </span>
+
+                        <button
+                          onClick={() => removeItem(item.product.id, item.talla, item.color)}
+                          className="text-zinc-500 hover:text-red-400 p-1 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -714,6 +811,20 @@ export const POSPage: React.FC = () => {
         onClose={() => setIsReturnModalOpen(false)}
         onSuccess={() => {
           loadInventory();
+        }}
+      />
+
+      {/* Void Sale Modal */}
+      <VoidSaleModal
+        isOpen={isVoidModalOpen}
+        onClose={() => setIsVoidModalOpen(false)}
+        onSuccess={(voided) => {
+          loadInventory();
+          setBarcodeFeedback({
+            msg: `Venta #${voided.numeroTicket} anulada correctamente. Stock restituido.`,
+            isError: false
+          });
+          setTimeout(() => setBarcodeFeedback(null), 4000);
         }}
       />
 

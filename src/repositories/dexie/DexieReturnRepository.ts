@@ -50,10 +50,20 @@ export class DexieReturnRepository implements IReturnRepository {
             updatedStockPorTalla[retItem.talla] = (updatedStockPorTalla[retItem.talla] || 0) + retItem.cantidad;
           }
 
+          let updatedColores = prod.colores ? [...prod.colores] : undefined;
+          if (updatedColores && retItem.color) {
+            updatedColores = updatedColores.map(c =>
+              c.color.toLowerCase() === retItem.color?.toLowerCase()
+                ? { ...c, stock: c.stock + retItem.cantidad }
+                : c
+            );
+          }
+
           await db.productos.update(prod.id, {
             stock: updatedStock,
             stockPorSucursal: Object.keys(updatedStockPorSucursal).length > 0 ? updatedStockPorSucursal : undefined,
-            stockPorTalla: updatedStockPorTalla
+            stockPorTalla: updatedStockPorTalla,
+            colores: updatedColores
           });
         }
       }
@@ -77,10 +87,20 @@ export class DexieReturnRepository implements IReturnRepository {
               updatedStockPorTalla[newItem.talla] = Math.max(0, updatedStockPorTalla[newItem.talla] - newItem.cantidad);
             }
 
+            let updatedColores = prod.colores ? [...prod.colores] : undefined;
+            if (updatedColores && newItem.color) {
+              updatedColores = updatedColores.map(c =>
+                c.color.toLowerCase() === newItem.color?.toLowerCase()
+                  ? { ...c, stock: Math.max(0, c.stock - newItem.cantidad) }
+                  : c
+              );
+            }
+
             await db.productos.update(prod.id, {
               stock: updatedStock,
               stockPorSucursal: Object.keys(updatedStockPorSucursal).length > 0 ? updatedStockPorSucursal : undefined,
-              stockPorTalla: updatedStockPorTalla
+              stockPorTalla: updatedStockPorTalla,
+              colores: updatedColores
             });
           }
         }

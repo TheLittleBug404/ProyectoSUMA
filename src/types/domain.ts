@@ -22,6 +22,7 @@ export interface User {
 
 export type CashShiftStatus = 'ABIERTA' | 'CERRADA';
 export type CashExpenseCategory = 'PROVEEDOR' | 'SERVICIOS' | 'SUELDO' | 'ADELANTO' | 'VARIOS';
+export type SaleStatus = 'COMPLETADA' | 'ANULADA';
 
 export interface CashRegister {
   id: string;
@@ -44,6 +45,11 @@ export interface CashRegister {
   montoRealEfectivo?: number; // Conteo físico arqueo
   diferencia?: number; // montoRealEfectivo - montoEsperadoEfectivo
   notas?: string;
+
+  // Ventas anuladas / reembolsos
+  totalVentasAnuladasEfectivo?: number;
+  totalVentasAnuladasMonto?: number;
+  cantidadVentasAnuladas?: number;
 }
 
 export interface CashExpense {
@@ -64,6 +70,12 @@ export interface Category {
   id: string;
   nombre: string;
   descripcion?: string;
+}
+
+export interface ProductColorVariant {
+  color: string;
+  colorHex: string;
+  stock: number;
 }
 
 export interface Product {
@@ -87,6 +99,7 @@ export interface Product {
   stockPorSucursal?: Record<string, number>; // { [sucursalId]: stock }
   color?: string;
   colorHex?: string; // Código hexadecimal para paleta visual (ej: #000000)
+  colores?: ProductColorVariant[]; // Variantes de colores con stock individual
 }
 
 export interface SaleItem {
@@ -97,6 +110,7 @@ export interface SaleItem {
   subtotal: number;
   talla?: string;
   color?: string;
+  colorHex?: string;
 }
 
 export interface Customer {
@@ -158,6 +172,14 @@ export interface Sale {
   clienteNombre?: string;
   clienteTelefono?: string;
   clienteDocumento?: string;
+
+  // Estado y Auditoría de Anulación
+  estado?: SaleStatus; // 'COMPLETADA' (default) | 'ANULADA'
+  anuladoPorId?: string;
+  anuladoPorNombre?: string;
+  anuladoPorRol?: UserRole;
+  fechaAnulacion?: string; // ISO
+  motivoAnulacion?: string;
 }
 
 export interface SaleStats {

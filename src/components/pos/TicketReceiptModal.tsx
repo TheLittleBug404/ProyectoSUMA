@@ -36,7 +36,7 @@ export const TicketReceiptModal: React.FC<TicketReceiptModalProps> = ({
 
     const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
     const itemsText = sale.items
-      .map(i => `• ${i.cantidad}x ${i.nombreProducto}${i.talla ? ` [Talla ${i.talla}]` : ''} - Bs. ${i.subtotal.toFixed(2)}`)
+      .map(i => `• ${i.cantidad}x ${i.nombreProducto}${i.talla ? ` [Talla ${i.talla}]` : ''}${i.color ? ` [Color ${i.color}]` : ''} - Bs. ${i.subtotal.toFixed(2)}`)
       .join('\n');
 
     const msg = `👗 *SAMU Moda Femenina*
@@ -58,9 +58,9 @@ ${sale.descuentoMonto ? `Subtotal: Bs. ${(sale.subtotal || sale.total).toFixed(2
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-sm bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl animate-scale-in"
+        className="relative w-full max-w-sm max-h-[92vh] flex flex-col bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar */}
@@ -126,7 +126,7 @@ ${sale.descuentoMonto ? `Subtotal: Bs. ${(sale.subtotal || sale.total).toFixed(2
                   <div className="pr-2">
                     <p className="font-bold text-black line-clamp-1">{item.nombreProducto}</p>
                     <p className="text-[10px] text-zinc-600">
-                      {item.cantidad} x Bs. {item.precioUnitario.toFixed(2)} {item.talla ? `[Talla ${item.talla}]` : ''}
+                      {item.cantidad} x Bs. {item.precioUnitario.toFixed(2)} {item.talla ? `[Talla ${item.talla}]` : ''} {item.color ? `[Color ${item.color}]` : ''}
                     </p>
                   </div>
                   <span className="font-bold shrink-0">Bs. {item.subtotal.toFixed(2)}</span>

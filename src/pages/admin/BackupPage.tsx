@@ -26,8 +26,10 @@ import {
   exportCustomersToCSV 
 } from '../../db/backup';
 import { seedInitialDataIfNeeded } from '../../db/seed';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const BackupPage: React.FC = () => {
+  const { confirm, showToast } = useModalStore();
   const [stats, setStats] = useState({
     sucursales: 0,
     usuarios: 0,
@@ -97,7 +99,14 @@ export const BackupPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm('⚠️ ADVERTENCIA: Importar un respaldo sobrescribirá los datos actuales de la tienda en este navegador. ¿Deseas continuar?')) {
+    const ok = await confirm({
+      title: 'Sobrescribir Base de Datos',
+      message: 'ADVERTENCIA:\nImportar un archivo de respaldo sobrescribirá todos los datos actuales de la tienda en este navegador.\n\n¿Estás seguro de que deseas continuar?',
+      confirmText: 'Sí, restaurar respaldo',
+      variant: 'danger'
+    });
+
+    if (!ok) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -110,6 +119,7 @@ export const BackupPage: React.FC = () => {
 
       if (res.success) {
         setStatusMessage({ text: '¡Base de datos restaurada exitosamente!' });
+        showToast('¡Base de datos restaurada con éxito!');
         await loadDatabaseCounts();
       } else {
         setStatusMessage({ text: res.message, isError: true });
@@ -123,13 +133,21 @@ export const BackupPage: React.FC = () => {
   };
 
   const handleResetToFactorySeed = async () => {
-    if (window.confirm('⚠️ ¿Estás seguro de restablecer la base de datos a los valores de fábrica (Seed inicial)? Se perderán las ventas actuales no respaldadas.')) {
+    const ok = await confirm({
+      title: 'Restablecer Valores de Fábrica',
+      message: '¿Estás seguro de restablecer la base de datos a los valores iniciales de fábrica?\n\nSe eliminarán las ventas y egresos no respaldados.',
+      confirmText: 'Sí, restablecer de fábrica',
+      variant: 'danger'
+    });
+
+    if (ok) {
       try {
         setLoading(true);
         localStorage.removeItem('samu_prod_clean_v1');
         await seedInitialDataIfNeeded();
         await loadDatabaseCounts();
         setStatusMessage({ text: 'Base de datos restaurada al estado inicial de producción.' });
+        showToast('Base de datos restablecida');
       } catch (err: any) {
         setStatusMessage({ text: err.message || 'Error al restablecer', isError: true });
       } finally {

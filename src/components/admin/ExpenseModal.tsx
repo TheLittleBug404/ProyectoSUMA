@@ -60,12 +60,12 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-md bg-[#121216] border border-red-500/30 rounded-2xl overflow-hidden shadow-2xl animate-scale-in"
+        className="relative w-full max-w-md max-h-[92vh] flex flex-col bg-[#121216] border border-red-500/30 rounded-2xl overflow-hidden shadow-2xl my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 bg-[#181820] border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 bg-[#181820] border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-2 text-red-400">
             <ArrowDownCircle className="w-5 h-5" />
             <h3 className="text-sm font-bold text-white tracking-wide">
@@ -81,12 +81,12 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
         </div>
 
         {error && (
-          <div className="mx-5 mt-4 p-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-xs">
+          <div className="mx-5 mt-4 p-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-xs shrink-0">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1">
               Categoría del Gasto *

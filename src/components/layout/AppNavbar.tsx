@@ -56,7 +56,7 @@ export const AppNavbar: React.FC = () => {
   };
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+    `flex items-center gap-1.5 px-2.5 py-1.5 2xl:px-3 2xl:py-2 rounded-xl text-[11px] 2xl:text-xs font-semibold transition-all whitespace-nowrap ${
       isActive
         ? 'bg-amber-400 text-zinc-950 font-bold shadow-[0_0_12px_rgba(212,175,55,0.3)]'
         : 'text-zinc-300 hover:text-white hover:bg-zinc-800/70'
@@ -99,7 +99,7 @@ export const AppNavbar: React.FC = () => {
         </div>
 
         {/* Desktop Navigation Links */}
-        <div className="hidden lg:flex items-center gap-1.5">
+        <div className="hidden xl:flex items-center gap-1 2xl:gap-1.5">
           <NavLink to="/catalogo" className={navLinkClass}>
             <ShoppingBag className="w-3.5 h-3.5" /> Catálogo
           </NavLink>
@@ -170,7 +170,7 @@ export const AppNavbar: React.FC = () => {
           {/* Mobile Hamburger toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
+            className="xl:hidden p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -179,7 +179,7 @@ export const AppNavbar: React.FC = () => {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden pt-4 pb-2 border-t border-zinc-800/80 mt-3 space-y-1.5 animate-fade-in">
+        <div className="xl:hidden pt-4 pb-2 border-t border-zinc-800/80 mt-3 space-y-1.5 animate-fade-in max-h-[80vh] overflow-y-auto">
           {user && (
             <div className="px-3 py-2 mb-2 bg-[#181820] rounded-xl flex items-center justify-between">
               <div>

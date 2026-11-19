@@ -14,8 +14,10 @@ import { customerRepository } from '../../repositories/dexie/DexieCustomerReposi
 import { CustomerFormModal } from '../../components/admin/CustomerFormModal';
 import type { Customer } from '../../types/domain';
 import type { CustomerFormData } from '../../schemas/customerSchema';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const AdminCustomersPage: React.FC = () => {
+  const { confirm, showToast } = useModalStore();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,13 +63,19 @@ export const AdminCustomersPage: React.FC = () => {
   };
 
   const handleDelete = async (customer: Customer) => {
-    if (!window.confirm(`¿Seguro que deseas eliminar al cliente "${customer.nombre}"?`)) return;
+    const ok = await confirm({
+      title: 'Eliminar Cliente',
+      message: `¿Estás seguro de que deseas eliminar al cliente "${customer.nombre}"?`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger'
+    });
+
+    if (!ok) return;
 
     try {
       await customerRepository.delete(customer.id);
-      setFeedback({ text: `Cliente "${customer.nombre}" eliminado.` });
+      showToast(`Cliente "${customer.nombre}" eliminado`);
       await loadCustomers();
-      setTimeout(() => setFeedback(null), 3000);
     } catch (err: any) {
       setFeedback({ text: err.message || 'Error al eliminar cliente', isError: true });
     }

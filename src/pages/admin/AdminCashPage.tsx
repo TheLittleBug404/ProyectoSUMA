@@ -8,18 +8,22 @@ import {
   QrCode, 
   Banknote,
   Trash2,
-  FileText
+  FileText,
+  Ban
 } from 'lucide-react';
-import type { CashRegister, CashExpense } from '../../types/domain';
+import type { CashRegister, CashExpense, Sale } from '../../types/domain';
 import { cashRepository } from '../../repositories/dexie/DexieCashRepository';
+import { saleRepository } from '../../repositories/dexie/DexieSaleRepository';
 import type { LiveCashStats, CashPeriodSummary } from '../../repositories/interfaces/ICashRepository';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { OpenCashModal } from '../../components/admin/OpenCashModal';
 import { ExpenseModal } from '../../components/admin/ExpenseModal';
 import { CloseCashModal } from '../../components/admin/CloseCashModal';
 import { CashCloseReceiptModal } from '../../components/admin/CashCloseReceiptModal';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const AdminCashPage: React.FC = () => {
+  const { confirm, showToast } = useModalStore();
   const { user } = useAuthStore();
 
   // Active shift state
@@ -40,9 +44,10 @@ export const AdminCashPage: React.FC = () => {
   const [periodSummary, setPeriodSummary] = useState<CashPeriodSummary | null>(null);
   const [historicalShifts, setHistoricalShifts] = useState<CashRegister[]>([]);
   const [historicalExpenses, setHistoricalExpenses] = useState<CashExpense[]>([]);
+  const [voidedSales, setVoidedSales] = useState<Sale[]>([]);
 
   // Active view tab in bottom section
-  const [activeTab, setActiveTab] = useState<'cierres' | 'egresos'>('cierres');
+  const [activeTab, setActiveTab] = useState<'cierres' | 'egresos' | 'anulaciones'>('cierres');
 
   // Modals state
   const [isOpenCashModalOpen, setIsOpenCashModalOpen] = useState(false);
@@ -69,7 +74,7 @@ export const AdminCashPage: React.FC = () => {
       const fromParam = period === 'rango' && customFrom ? new Date(customFrom + 'T00:00:00').toISOString() : undefined;
       const toParam = period === 'rango' && customTo ? new Date(customTo + 'T23:59:59').toISOString() : undefined;
 
-      const [summary, shifts, expenses] = await Promise.all([
+      const [summary, shifts, expenses, voided] = await Promise.all([
         cashRepository.getPeriodSummary({
           periodo: period,
           from: fromParam,
@@ -82,12 +87,18 @@ export const AdminCashPage: React.FC = () => {
         cashRepository.getExpenses({
           from: fromParam,
           to: toParam
+        }),
+        saleRepository.getSales({
+          from: fromParam,
+          to: toParam,
+          estado: 'ANULADA'
         })
       ]);
 
       setPeriodSummary(summary);
       setHistoricalShifts(shifts);
       setHistoricalExpenses(expenses);
+      setVoidedSales(voided);
     } catch (err) {
       console.error('Error cargando módulo de caja:', err);
     } finally {
@@ -143,8 +154,16 @@ export const AdminCashPage: React.FC = () => {
   };
 
   const handleDeleteExpense = async (id: string) => {
-    if (window.confirm('¿Deseas eliminar este registro de egreso?')) {
+    const ok = await confirm({
+      title: 'Eliminar Egreso',
+      message: '¿Estás seguro de que deseas eliminar este registro de egreso de caja?',
+      confirmText: 'Sí, eliminar',
+      variant: 'danger'
+    });
+
+    if (ok) {
       await cashRepository.deleteExpense(id);
+      showToast('Registro de egreso eliminado');
       await loadData();
     }
   };
@@ -375,7 +394,7 @@ export const AdminCashPage: React.FC = () => {
 
           {/* Sub-Tabs: Cierres de caja vs Egresos */}
           <div className="bg-[#121216] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="flex items-center gap-4 px-5 py-3 bg-[#181820] border-b border-zinc-800">
+            <div className="flex items-center gap-4 px-5 py-3 bg-[#181820] border-b border-zinc-800 overflow-x-auto whitespace-nowrap">
               <button
                 onClick={() => setActiveTab('cierres')}
                 className={`flex items-center gap-2 pb-1 text-xs font-bold transition-all cursor-pointer ${
@@ -398,6 +417,18 @@ export const AdminCashPage: React.FC = () => {
               >
                 <ArrowDownCircle className="w-4 h-4" />
                 <span>Registro de Egresos & Gastos ({historicalExpenses.length})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('anulaciones')}
+                className={`flex items-center gap-2 pb-1 text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'anulaciones'
+                    ? 'text-red-400 border-b-2 border-red-400'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Ban className="w-4 h-4" />
+                <span>Auditoría de Ventas Anuladas ({voidedSales.length})</span>
               </button>
             </div>
 
@@ -507,6 +538,64 @@ export const AdminCashPage: React.FC = () => {
               </div>
             )}
 
+            {/* TAB 3: Auditoría de Ventas Anuladas */}
+            {activeTab === 'anulaciones' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#14141a] border-b border-zinc-800 text-zinc-400 uppercase text-[10px] tracking-wider font-bold">
+                      <th className="py-3 px-4">Nº Ticket</th>
+                      <th className="py-3 px-4">Fecha Venta</th>
+                      <th className="py-3 px-4">Fecha Anulación</th>
+                      <th className="py-3 px-4">Anulado Por</th>
+                      <th className="py-3 px-4">Motivo de Anulación</th>
+                      <th className="py-3 px-4">Prendas Reingresadas</th>
+                      <th className="py-3 px-4 text-right">Monto Devuelto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {voidedSales.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-zinc-500">
+                          No se registraron ventas anuladas en este período.
+                        </td>
+                      </tr>
+                    ) : (
+                      voidedSales.map((v) => (
+                        <tr key={v.id} className="hover:bg-zinc-900/40 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-red-400">
+                            {v.numeroTicket}
+                          </td>
+                          <td className="py-3 px-4 text-zinc-400 text-[11px]">
+                            {new Date(v.fecha).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                          <td className="py-3 px-4 text-zinc-300 text-[11px]">
+                            {v.fechaAnulacion 
+                              ? new Date(v.fechaAnulacion).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })
+                              : '—'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-white font-semibold">{v.anuladoPorNombre || 'Personal'}</span>
+                            <span className="ml-1 text-[10px] text-zinc-400">({v.anuladoPorRol || 'Cajero'})</span>
+                          </td>
+                          <td className="py-3 px-4 text-zinc-300 max-w-xs truncate" title={v.motivoAnulacion}>
+                            {v.motivoAnulacion || 'Sin motivo'}
+                          </td>
+                          <td className="py-3 px-4 text-zinc-400 text-[11px]">
+                            {v.items.map(i => `${i.cantidad}x ${i.nombreProducto}${i.talla ? ` [${i.talla}]` : ''}`).join(', ')}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-red-400">
+                            - Bs. {v.total.toFixed(2)}
+                            <span className="block text-[9px] text-zinc-500 font-sans font-normal">{v.metodoPago}</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* TAB 2: Registro de Egresos */}
             {activeTab === 'egresos' && (
               <div className="overflow-x-auto">
@@ -560,6 +649,64 @@ export const AdminCashPage: React.FC = () => {
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* TAB 3: Auditoría de Ventas Anuladas */}
+            {activeTab === 'anulaciones' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#14141a] border-b border-zinc-800 text-zinc-400 uppercase text-[10px] tracking-wider font-bold">
+                      <th className="py-3 px-4">Nº Ticket</th>
+                      <th className="py-3 px-4">Fecha Venta</th>
+                      <th className="py-3 px-4">Fecha Anulación</th>
+                      <th className="py-3 px-4">Anulado Por</th>
+                      <th className="py-3 px-4">Motivo de Anulación</th>
+                      <th className="py-3 px-4">Prendas Reingresadas</th>
+                      <th className="py-3 px-4 text-right">Monto Devuelto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {voidedSales.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-zinc-500">
+                          No se registraron ventas anuladas en este período.
+                        </td>
+                      </tr>
+                    ) : (
+                      voidedSales.map((v) => (
+                        <tr key={v.id} className="hover:bg-zinc-900/40 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-red-400">
+                            {v.numeroTicket}
+                          </td>
+                          <td className="py-3 px-4 text-zinc-400 text-[11px]">
+                            {new Date(v.fecha).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                          <td className="py-3 px-4 text-zinc-300 text-[11px]">
+                            {v.fechaAnulacion 
+                              ? new Date(v.fechaAnulacion).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })
+                              : '—'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-white font-semibold">{v.anuladoPorNombre || 'Personal'}</span>
+                            <span className="ml-1 text-[10px] text-zinc-400">({v.anuladoPorRol || 'Cajero'})</span>
+                          </td>
+                          <td className="py-3 px-4 text-zinc-300 max-w-xs truncate" title={v.motivoAnulacion}>
+                            {v.motivoAnulacion || 'Sin motivo'}
+                          </td>
+                          <td className="py-3 px-4 text-zinc-400 text-[11px]">
+                            {v.items.map(i => `${i.cantidad}x ${i.nombreProducto}${i.talla ? ` [${i.talla}]` : ''}`).join(', ')}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-red-400">
+                            - Bs. {v.total.toFixed(2)}
+                            <span className="block text-[9px] text-zinc-500 font-sans font-normal">{v.metodoPago}</span>
                           </td>
                         </tr>
                       ))

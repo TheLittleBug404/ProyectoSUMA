@@ -15,6 +15,7 @@ import { productRepository } from '../../repositories/dexie/DexieProductReposito
 import { returnRepository } from '../../repositories/dexie/DexieReturnRepository';
 import type { Sale, Product, SaleItem, SaleReturnItem } from '../../types/domain';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useModalStore } from '../../stores/useModalStore';
 
 interface ReturnExchangeModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const ReturnExchangeModal: React.FC<ReturnExchangeModalProps> = ({
   onClose,
   onSuccess
 }) => {
+  const { showAlert } = useModalStore();
   const { user } = useAuthStore();
   const [ticketSearch, setTicketSearch] = useState('');
   const [searching, setSearching] = useState(false);
@@ -156,7 +158,11 @@ export const ReturnExchangeModal: React.FC<ReturnExchangeModalProps> = ({
       setCompletedReturn(res);
       onSuccess();
     } catch (err: any) {
-      alert(err.message || 'Error al procesar la devolución');
+      await showAlert({
+        title: 'Error en Devolución',
+        message: err.message || 'Error al procesar la devolución o cambio',
+        type: 'error'
+      });
     } finally {
       setIsSubmitting(false);
     }

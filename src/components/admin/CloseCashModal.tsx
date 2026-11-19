@@ -49,12 +49,12 @@ export const CloseCashModal: React.FC<CloseCashModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-lg bg-[#121216] border border-amber-500/35 rounded-2xl overflow-hidden shadow-2xl animate-scale-in"
+        className="relative w-full max-w-lg max-h-[92vh] flex flex-col bg-[#121216] border border-amber-500/35 rounded-2xl overflow-hidden shadow-2xl my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 bg-[#181820] border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 bg-[#181820] border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-2 text-amber-300">
             <Lock className="w-5 h-5" />
             <h3 className="text-sm font-bold text-white tracking-wide">
@@ -70,12 +70,12 @@ export const CloseCashModal: React.FC<CloseCashModalProps> = ({
         </div>
 
         {error && (
-          <div className="mx-5 mt-4 p-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-xs">
+          <div className="mx-5 mt-4 p-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-xs shrink-0">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* Summary Box */}
           <div className="bg-[#181820] border border-zinc-800 rounded-xl p-3.5 space-y-2 text-xs">
             <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold mb-1">
@@ -101,6 +101,12 @@ export const CloseCashModal: React.FC<CloseCashModalProps> = ({
               <span>(-) Salidas de Efectivo / Egresos ({liveStats.egresosCount}):</span>
               <span className="font-mono font-bold">- Bs. {liveStats.totalEgresos.toFixed(2)}</span>
             </div>
+            {liveStats.cantidadVentasAnuladas > 0 && (
+              <div className="flex justify-between text-pink-400 text-[11px] bg-pink-500/10 p-1.5 rounded">
+                <span>(ℹ) Ventas Anuladas ({liveStats.cantidadVentasAnuladas}):</span>
+                <span className="font-mono font-bold">Devuelto -Bs. {liveStats.totalVentasAnuladasEfectivo.toFixed(2)}</span>
+              </div>
+            )}
             <div className="pt-2 border-t border-zinc-700 flex justify-between text-sm font-bold text-white">
               <span>(=) Efectivo que DEBE haber en gaveta:</span>
               <span className="font-mono text-amber-300">Bs. {esperado.toFixed(2)}</span>

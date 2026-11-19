@@ -5,8 +5,10 @@ import { userRepository } from '../../repositories/dexie/DexieUserRepository';
 import { branchRepository } from '../../repositories/dexie/DexieBranchRepository';
 import { UserFormModal } from '../../components/admin/UserFormModal';
 import { db } from '../../db/dexie';
+import { useModalStore } from '../../stores/useModalStore';
 
 export const AdminUsersPage: React.FC = () => {
+  const { confirm, showAlert, showToast } = useModalStore();
   const [users, setUsers] = useState<User[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +44,10 @@ export const AdminUsersPage: React.FC = () => {
   const handleSaveUser = async (data: Omit<User, 'id' | 'createdAt'>) => {
     if (userToEdit) {
       await userRepository.update(userToEdit.id, data);
+      showToast('Usuario actualizado con éxito');
     } else {
       await userRepository.create(data);
+      showToast('Nuevo usuario creado con éxito');
     }
     await loadData();
   };
@@ -52,26 +56,55 @@ export const AdminUsersPage: React.FC = () => {
     const newStatus = !user.activo;
     const actionText = newStatus ? 'activar' : 'desactivar';
 
-    if (window.confirm(`¿Deseas ${actionText} la cuenta de "${user.nombre}"?`)) {
+    const ok = await confirm({
+      title: `${newStatus ? 'Activar' : 'Desactivar'} Usuario`,
+      message: `¿Deseas ${actionText} la cuenta de "${user.nombre}"?`,
+      confirmText: newStatus ? 'Activar' : 'Desactivar',
+      variant: newStatus ? 'info' : 'warning'
+    });
+
+    if (ok) {
       await userRepository.update(user.id, { activo: newStatus });
+      showToast(`Usuario ${newStatus ? 'activado' : 'desactivado'} con éxito`);
       await loadData();
     }
   };
 
   const handleDeleteUser = async (user: User) => {
     if (user.rol === 'ADMINISTRADOR' && users.filter(u => u.rol === 'ADMINISTRADOR' && u.activo).length <= 1) {
-      alert('No se puede eliminar el único administrador del sistema.');
+      await showAlert({
+        title: 'Acción no permitida',
+        message: 'No se puede eliminar el único administrador del sistema.',
+        type: 'warning'
+      });
       return;
     }
 
-    if (window.confirm(`¿Deseas eliminar al usuario "${user.nombre}"?`)) {
+    const ok = await confirm({
+      title: 'Eliminar Usuario',
+      message: `¿Estás seguro de que deseas eliminar al usuario "${user.nombre}"?`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger'
+    });
+
+    if (ok) {
       const salesCount = await db.ventas.where('empleadoId').equals(user.id).count();
       if (salesCount > 0) {
-        if (window.confirm(`Este usuario tiene ${salesCount} ventas registradas. Para preservar el historial contable se desactivará su cuenta. ¿Continuar?`)) {
+        const preserveOk = await confirm({
+          title: 'Preservar Historial Contable',
+          message: `Este usuario tiene ${salesCount} ventas registradas. Para preservar el historial contable se desactivará su cuenta en lugar de borrarla definitivamente. ¿Continuar?`,
+          confirmText: 'Entendido, desactivar',
+          variant: 'warning'
+        });
+        if (preserveOk) {
           await userRepository.delete(user.id);
+          showToast(`Cuenta de "${user.nombre}" desactivada`, 'info');
+        } else {
+          return;
         }
       } else {
         await db.usuarios.delete(user.id);
+        showToast(`Usuario "${user.nombre}" eliminado con éxito`);
       }
       await loadData();
     }

@@ -98,9 +98,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-md bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(212,175,55,0.2)] animate-scale-in"
+        className="relative w-full max-w-md max-h-[92vh] flex flex-col bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(212,175,55,0.2)] my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -40,9 +40,9 @@ export const PrintQREtiquetteModal: React.FC<PrintQREtiquetteModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-sm bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl animate-scale-in"
+        className="relative w-full max-w-sm max-h-[92vh] flex flex-col bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar */}

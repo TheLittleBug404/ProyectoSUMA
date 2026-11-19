@@ -35,6 +35,9 @@ export interface LiveCashStats {
   totalVentasTarjeta: number;
   totalVentasGeneral: number;
   ventasCount: number;
+  totalVentasAnuladasEfectivo: number;
+  totalVentasAnuladasMonto: number;
+  cantidadVentasAnuladas: number;
   totalEgresos: number;
   egresosCount: number;
   montoEsperadoEfectivo: number;
@@ -48,6 +51,8 @@ export interface CashPeriodSummary {
   totalVentasQR: number;
   totalVentasTarjeta: number;
   totalIngresosVentas: number;
+  totalVentasAnuladas?: number;
+  montoVentasAnuladas?: number;
   totalEgresos: number;
   balanceNeto: number; // totalIngresosVentas - totalEgresos
   cierresRealizados: number;

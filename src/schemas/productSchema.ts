@@ -12,6 +12,11 @@ export const productSchema = z.object({
   stockPorTalla: z.record(z.string(), z.number()).optional(),
   color: z.string().optional(),
   colorHex: z.string().optional(),
+  colores: z.array(z.object({
+    color: z.string(),
+    colorHex: z.string(),
+    stock: z.number().int().min(0)
+  })).optional(),
   sucursalesIds: z.array(z.string()).optional(),
   qrCode: z.string().optional(),
   fotoUrl: z.string().optional()

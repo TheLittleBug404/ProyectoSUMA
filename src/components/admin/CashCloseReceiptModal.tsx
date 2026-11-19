@@ -24,9 +24,9 @@ export const CashCloseReceiptModal: React.FC<CashCloseReceiptModalProps> = ({
   const isSurplus = diferencia > 0.01;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-lg bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl animate-scale-in"
+        className="relative w-full max-w-lg max-h-[92vh] flex flex-col bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -107,6 +107,12 @@ export const CashCloseReceiptModal: React.FC<CashCloseReceiptModalProps> = ({
               <span>(-) Egresos / Gastos de Turno:</span>
               <span className="font-bold">- Bs. {caja.totalEgresos.toFixed(2)}</span>
             </div>
+            {caja.cantidadVentasAnuladas && caja.cantidadVentasAnuladas > 0 ? (
+              <div className="flex justify-between items-center text-pink-400 text-[11px] pt-1">
+                <span>(ℹ) Ventas Anuladas ({caja.cantidadVentasAnuladas}):</span>
+                <span className="font-bold">Devuelto -Bs. {(caja.totalVentasAnuladasEfectivo || 0).toFixed(2)}</span>
+              </div>
+            ) : null}
           </div>
 
           {/* Cash reconciliation summary */}

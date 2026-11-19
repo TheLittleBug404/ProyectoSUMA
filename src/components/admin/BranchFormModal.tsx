@@ -55,9 +55,9 @@ export const BranchFormModal: React.FC<BranchFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       <div 
-        className="relative w-full max-w-md bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl animate-scale-in"
+        className="relative w-full max-w-md max-h-[92vh] flex flex-col bg-[#121216] border border-[#d4af37]/35 rounded-2xl overflow-hidden shadow-2xl my-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 bg-[#181820] border-b border-zinc-800">
@@ -75,7 +75,7 @@ export const BranchFormModal: React.FC<BranchFormModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1">
               Nombre de la Sucursal *

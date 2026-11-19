@@ -6,6 +6,8 @@ export interface CartItem {
   quantity: number;
   subtotal: number;
   talla?: string;
+  color?: string;
+  colorHex?: string;
 }
 
 interface CartState {
@@ -14,9 +16,9 @@ interface CartState {
   cliente: Customer | null;
   descuentoPorcentaje: number;
 
-  addItem: (product: Product, quantity?: number, talla?: string) => { success: boolean; message?: string };
-  updateQuantity: (productId: string, quantity: number, talla?: string) => { success: boolean; message?: string };
-  removeItem: (productId: string, talla?: string) => void;
+  addItem: (product: Product, quantity?: number, talla?: string, color?: string, colorHex?: string) => { success: boolean; message?: string };
+  updateQuantity: (productId: string, quantity: number, talla?: string, color?: string) => { success: boolean; message?: string };
+  removeItem: (productId: string, talla?: string, color?: string) => void;
   clearCart: () => void;
   setPaymentMethod: (method: 'EFECTIVO' | 'QR' | 'TARJETA') => void;
   setCliente: (cliente: Customer | null) => void;
@@ -35,21 +37,41 @@ export const useCartStore = create<CartState>((set, get) => ({
   cliente: null,
   descuentoPorcentaje: 0,
 
-  addItem: (product: Product, quantity = 1, talla?: string) => {
+  addItem: (product: Product, quantity = 1, talla?: string, color?: string, colorHex?: string) => {
     const { items } = get();
     const effectiveTalla = talla || product.talla || (product.tallas && product.tallas[0]) || 'ÚNICA';
+    
+    // Color variante
+    let effectiveColor = color || product.color || '';
+    let effectiveColorHex = colorHex || product.colorHex || '';
+    if (!effectiveColor && product.colores && product.colores.length > 0) {
+      effectiveColor = product.colores[0].color;
+      effectiveColorHex = product.colores[0].colorHex;
+    }
+
+    // Calcular stock máximo según la variante de color o el stock global
+    let maxAvailableStock = product.stock;
+    if (product.colores && product.colores.length > 0 && effectiveColor) {
+      const variant = product.colores.find(c => c.color.toLowerCase() === effectiveColor.toLowerCase());
+      if (variant) {
+        maxAvailableStock = variant.stock;
+      }
+    }
+
     const existingIndex = items.findIndex(
-      i => i.product.id === product.id && i.talla === effectiveTalla
+      i => i.product.id === product.id && 
+           i.talla === effectiveTalla && 
+           (i.color || '') === effectiveColor
     );
 
     if (existingIndex > -1) {
       const existing = items[existingIndex];
       const newQuantity = existing.quantity + quantity;
 
-      if (newQuantity > product.stock) {
+      if (newQuantity > maxAvailableStock) {
         return {
           success: false,
-          message: `Stock máximo alcanzado para "${product.nombre}" (${product.stock} disponibles)`
+          message: `Stock máximo para "${product.nombre}" (${effectiveColor || 'Color'}) es ${maxAvailableStock}`
         };
       }
 
@@ -63,10 +85,10 @@ export const useCartStore = create<CartState>((set, get) => ({
       set({ items: updatedItems });
       return { success: true };
     } else {
-      if (quantity > product.stock) {
+      if (quantity > maxAvailableStock) {
         return {
           success: false,
-          message: `Stock insuficiente para "${product.nombre}" (${product.stock} disponibles)`
+          message: `Stock insuficiente para "${product.nombre}" (${effectiveColor || 'Color'}: ${maxAvailableStock} disponibles)`
         };
       }
 
@@ -74,7 +96,9 @@ export const useCartStore = create<CartState>((set, get) => ({
         product,
         quantity,
         subtotal: quantity * product.precio,
-        talla: effectiveTalla
+        talla: effectiveTalla,
+        color: effectiveColor,
+        colorHex: effectiveColorHex
       };
 
       set({ items: [...items, newItem] });
@@ -82,26 +106,36 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  updateQuantity: (productId: string, quantity: number, talla?: string) => {
+  updateQuantity: (productId: string, quantity: number, talla?: string, color?: string) => {
     const { items } = get();
     if (quantity <= 0) {
-      get().removeItem(productId, talla);
+      get().removeItem(productId, talla, color);
       return { success: true };
     }
 
-    const item = items.find(i => i.product.id === productId && (!talla || i.talla === talla));
+    const item = items.find(
+      i => i.product.id === productId && 
+           (!talla || i.talla === talla) &&
+           (!color || i.color === color)
+    );
     if (!item) return { success: false, message: 'Producto no encontrado en carrito' };
 
-    if (quantity > item.product.stock) {
+    let maxStock = item.product.stock;
+    if (item.product.colores && item.product.colores.length > 0 && item.color) {
+      const variant = item.product.colores.find(c => c.color.toLowerCase() === item.color?.toLowerCase());
+      if (variant) maxStock = variant.stock;
+    }
+
+    if (quantity > maxStock) {
       return {
         success: false,
-        message: `Stock máximo de "${item.product.nombre}" es ${item.product.stock}`
+        message: `Stock máximo disponible para ${item.color || 'prenda'} es ${maxStock}`
       };
     }
 
     set({
       items: items.map(i =>
-        i.product.id === productId && (!talla || i.talla === talla)
+        i.product.id === productId && (!talla || i.talla === talla) && (!color || i.color === color)
           ? { ...i, quantity, subtotal: quantity * i.product.precio }
           : i
       )
@@ -109,9 +143,11 @@ export const useCartStore = create<CartState>((set, get) => ({
     return { success: true };
   },
 
-  removeItem: (productId: string, talla?: string) => {
+  removeItem: (productId: string, talla?: string, color?: string) => {
     set({
-      items: get().items.filter(i => !(i.product.id === productId && (!talla || i.talla === talla)))
+      items: get().items.filter(i => 
+        !(i.product.id === productId && (!talla || i.talla === talla) && (!color || i.color === color))
+      )
     });
   },
 
@@ -162,7 +198,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       precioUnitario: i.product.precio,
       subtotal: i.subtotal,
       talla: i.talla,
-      color: i.product.color
+      color: i.color || i.product.color,
+      colorHex: i.colorHex || i.product.colorHex
     }));
   }
 }));

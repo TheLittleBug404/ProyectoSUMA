@@ -9,6 +9,7 @@ import {
   Award,
   ArrowUpRight
 } from 'lucide-react';
+import { VoidSaleModal } from '../../components/pos/VoidSaleModal';
 import { 
   AreaChart, 
   Area, 
@@ -36,6 +37,8 @@ export const DashboardPage: React.FC = () => {
   // Filters
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('month');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  const [selectedSaleToVoid, setSelectedSaleToVoid] = useState<Sale | null>(null);
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
 
   const loadDashboardData = async () => {
     try {
@@ -404,45 +407,80 @@ export const DashboardPage: React.FC = () => {
                     <th className="py-2.5 px-3">Ticket</th>
                     <th className="py-2.5 px-3">Fecha y Hora</th>
                     <th className="py-2.5 px-3">Cajero</th>
+                    <th className="py-2.5 px-3">Estado</th>
                     <th className="py-2.5 px-3">Método</th>
                     <th className="py-2.5 px-3 text-right">Total</th>
+                    <th className="py-2.5 px-3 text-right">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
                   {recentSales.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-zinc-500 text-xs">
+                      <td colSpan={7} className="py-8 text-center text-zinc-500 text-xs">
                         Aún no se han cobrado ventas.
                       </td>
                     </tr>
                   ) : (
-                    recentSales.map((sale) => (
-                      <tr key={sale.id} className="hover:bg-zinc-900/40 transition-colors">
-                        <td className="py-2.5 px-3 font-mono font-bold text-amber-300">
-                          {sale.numeroTicket}
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-400 text-[11px]">
-                          {new Date(sale.fecha).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-200">
-                          {userMap.get(sale.empleadoId) || 'Cajero'}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                            sale.metodoPago === 'EFECTIVO'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : sale.metodoPago === 'QR'
-                              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
-                              : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+                    recentSales.map((sale) => {
+                      const isVoided = sale.estado === 'ANULADA';
+                      return (
+                        <tr key={sale.id} className="hover:bg-zinc-900/40 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-amber-300">
+                            {sale.numeroTicket}
+                          </td>
+                          <td className="py-2.5 px-3 text-zinc-400 text-[11px]">
+                            {new Date(sale.fecha).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}
+                          </td>
+                          <td className="py-2.5 px-3 text-zinc-200">
+                            {userMap.get(sale.empleadoId) || 'Cajero'}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {isVoided ? (
+                              <span 
+                                title={`Anulada por ${sale.anuladoPorNombre || 'Personal'}: ${sale.motivoAnulacion || ''}`}
+                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30"
+                              >
+                                ANULADA
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                COMPLETADA
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              sale.metodoPago === 'EFECTIVO'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : sale.metodoPago === 'QR'
+                                ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                                : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+                            }`}>
+                              {sale.metodoPago}
+                            </span>
+                          </td>
+                          <td className={`py-2.5 px-3 text-right font-mono font-bold ${
+                            isVoided ? 'text-zinc-500 line-through' : 'text-amber-400'
                           }`}>
-                            {sale.metodoPago}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-400">
-                          Bs. {sale.total.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
+                            Bs. {sale.total.toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {!isVoided && (
+                              <button
+                                onClick={() => {
+                                  setSelectedSaleToVoid(sale);
+                                  setIsVoidModalOpen(true);
+                                }}
+                                title="Anular venta y reingresar stock"
+                                className="px-2 py-1 rounded-lg text-[10px] font-semibold text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500/30 border border-red-500/20 transition-colors cursor-pointer"
+                              >
+                                Anular
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -450,6 +488,19 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal Anular Venta */}
+      <VoidSaleModal
+        isOpen={isVoidModalOpen}
+        preselectedSale={selectedSaleToVoid}
+        onClose={() => {
+          setIsVoidModalOpen(false);
+          setSelectedSaleToVoid(null);
+        }}
+        onSuccess={() => {
+          loadDashboardData();
+        }}
+      />
     </div>
   );
 };
